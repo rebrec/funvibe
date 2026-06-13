@@ -1,0 +1,18 @@
+{
+  "name": "jeuleo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Maquette - jeu d'aventure-plateforme 2D (Phaser 3)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.80.1"
+  },
+  "devDependencies": {
+    "vite": "^5.4.0"
+  }
+}
