@@ -196,23 +196,22 @@ export default class LevelScene extends Phaser.Scene {
     this.groundCoin(10000, 1210);
     this.groundCoinRow(11280, 1100, 4, 70); // après l'arrivée
 
-    // --- Pièces EN L'AIR (récompense d'un saut bien ajusté) ---
-    this.addCoin(2820, 1600); // arc au-dessus du 1er trou
-    this.addCoin(2870, 1555);
-    this.addCoin(2920, 1600);
-    this.addCoin(3760, 1250); // apex entre paliers de la tour B
-    this.addCoin(3760, 1030);
-    this.addCoin(7500, 1470); // saut au-dessus de la ligne de vitesse
-    this.addCoin(7600, 1470);
-    this.addCoin(9340, 1600); // arc au-dessus du 2e trou
-    this.addCoin(9380, 1600);
-    this.addCoin(10300, 940); // apex vers l'arrivée
-    this.addCoin(10580, 880);
+    // --- Pièces EN L'AIR (sur l'arc de saut, hauteurs conservatrices) ---
+    this.addCoin(2820, 1605); // arc au-dessus du 1er trou (le cristal occupe l'apex)
+    this.addCoin(2920, 1605);
+    this.addCoin(3760, 1255); // apex entre paliers de la tour B (~85 px au-dessus)
+    this.addCoin(3760, 1035);
+    this.addCoin(7500, 1515); // saut au-dessus de la ligne de vitesse (~85 px)
+    this.addCoin(7600, 1515);
+    this.addCoin(9340, 1605); // arc au-dessus du 2e trou
+    this.addCoin(9380, 1605);
+    this.addCoin(10300, 1015); // apex vers l'arrivée (~85 px au-dessus du palier)
+    this.addCoin(10580, 970);
 
     // --- Cristaux : un mélange posé / en l'air ---
     this.groundCrystal(4040, 790); // posé au sommet de la tour
-    this.addCrystal(4920, 690); // en l'air au-dessus de la section haute (saut)
-    this.addCrystal(2870, 1490); // en l'air, apex du saut au-dessus du trou
+    this.addCrystal(4920, 720); // en l'air au-dessus de la section haute (~70 px, saut)
+    this.addCrystal(2870, 1560); // en l'air, sur l'arc du saut au-dessus du trou
     this.groundCrystal(9870, 1100); // posé au sommet de la dernière tour
     this.groundCrystal(11100, 900); // posé près de l'ARRIVÉE
   }
