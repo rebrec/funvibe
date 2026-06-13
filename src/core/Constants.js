@@ -52,7 +52,13 @@ export const PLAYER = {
   ATTACK_DURATION: 160, // ms où la frappe est active
   ATTACK_COOLDOWN: 300, // ms entre deux frappes
   ATTACK_RANGE: 44, // portée de la frappe devant le héros
-  RANGED_COOLDOWN: 320, // ms entre deux lancers de projectile
+
+  // Attaque à distance — stock régénératif (toutes ces valeurs sont ÉVOLUTIVES :
+  // la boutique/les maîtrises pourront augmenter le stock, accélérer la recharge,
+  // ou réduire la cadence).
+  RANGED_COOLDOWN: 480, // ms entre deux lancers (plus lent par défaut)
+  RANGED_MAX_AMMO: 5, // stock de shurikens
+  RANGED_REGEN: 1100, // ms pour régénérer 1 shuriken
 };
 
 export const PROJECTILE = {
@@ -71,4 +77,17 @@ export const ENEMY = {
   JUMP_VELOCITY: 9,
   JUMP_INTERVAL_MIN: 1100, // ms entre deux sauts (aléatoire)
   JUMP_INTERVAL_MAX: 2800,
+
+  // Type "fonceur" : avance doucement, s'arrête (avec un clignotement
+  // d'avertissement), puis accélère brutalement, et recommence.
+  CHARGER: {
+    CREEP_SPEED: 0.7,
+    CREEP_TIME: 550, // ms d'avance lente
+    PAUSE_TIME: 850, // ms d'arrêt avant la charge
+    TELEGRAPH_TIME: 320, // ms de clignotement en fin de pause
+    DASH_TIME: 600, // ms de charge
+    DASH_START_SPEED: 2,
+    DASH_ACCEL: 1.1, // multiplicateur de vitesse par frame (~exponentiel)
+    DASH_MAX_SPEED: 13,
+  },
 };

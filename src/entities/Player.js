@@ -46,6 +46,9 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
     this.attackCooldown = 0;
     this.attackId = 0; // incrémenté à chaque frappe (1 touche max par ennemi/frappe)
     this.rangedCooldown = 0; // ms avant de pouvoir relancer un projectile
+    this.maxAmmo = PLAYER.RANGED_MAX_AMMO;
+    this.ammo = this.maxAmmo;
+    this.regenTimer = PLAYER.RANGED_REGEN; // ms avant +1 shuriken
     this.facing = 1; // 1 = droite, -1 = gauche
 
     // État sol, renseigné par les événements de collision Matter.
@@ -125,6 +128,16 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
     if (this.invincibleTimer === 0) this.setAlpha(1);
     if (input.isAttackJustPressed() && this.attackCooldown === 0) this.startAttack();
 
+    // Régénération des shurikens
+    if (this.ammo < this.maxAmmo) {
+      this.regenTimer -= delta;
+      if (this.regenTimer <= 0) {
+        this.ammo += 1;
+        this.regenTimer = PLAYER.RANGED_REGEN;
+        this.scene.registry.set('ammo', this.ammo);
+      }
+    }
+
     const vx = body.velocity.x;
     const vy = body.velocity.y;
 
@@ -198,6 +211,19 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
     const h = PLAYER.HEIGHT;
     const x = this.x + this.facing * (PLAYER.WIDTH / 2 + w / 2);
     return { x, y: this.y, w, h };
+  }
+
+  // L'attaque à distance est-elle disponible ? (cadence respectée + stock dispo)
+  canThrow() {
+    return this.rangedCooldown <= 0 && this.ammo > 0;
+  }
+
+  consumeAmmo() {
+    this.rangedCooldown = PLAYER.RANGED_COOLDOWN;
+    this.ammo -= 1;
+    // Si on était au max, relancer le compteur de régénération.
+    if (this.ammo === this.maxAmmo - 1) this.regenTimer = PLAYER.RANGED_REGEN;
+    this.scene.registry.set('ammo', this.ammo);
   }
 
   startAttack() {

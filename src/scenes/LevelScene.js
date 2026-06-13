@@ -60,9 +60,11 @@ export default class LevelScene extends Phaser.Scene {
     this.camLookaheadX = 0;
     this.camLookaheadY = 0;
 
-    // Vie initiale (non persistée : repart au max à chaque session/réapparition).
+    // Vie + munitions initiales (non persistées : repartent au max à chaque session).
     this.registry.set('maxHealth', PLAYER.MAX_HEALTH);
     this.registry.set('health', this.player.health);
+    this.registry.set('maxAmmo', this.player.maxAmmo);
+    this.registry.set('ammo', this.player.ammo);
 
     this.createHelpOverlay();
 
@@ -280,16 +282,15 @@ export default class LevelScene extends Phaser.Scene {
 
   // --- Ennemis ---
   buildEnemies() {
-    this.addEnemy(460, 1800, 320, 600, 1); // sol de départ
-    this.addEnemy(3470, 1450, 3400, 3540, 2); // palier après la pente raide (coriace)
-    this.addEnemy(6480, 1400, 6340, 6620, 1); // section descente
-    this.addEnemy(7300, 1600, 7100, 7600, 1); // ligne de vitesse
-    this.addEnemy(7700, 1600, 7620, 7900, 2);
-    this.addEnemy(9080, 1650, 8940, 9260, 2); // avant la dernière tour (coriace)
+    this.addEnemy(460, 1800, 320, 600, { hp: 1 }); // marcheur, sol de départ
+    this.addEnemy(3470, 1450, 3400, 3540, { hp: 2 }); // marcheur coriace
+    this.addEnemy(6480, 1400, 6340, 6620, { hp: 1 });
+    this.addEnemy(7350, 1600, 7100, 7850, { hp: 2, behavior: 'charger' }); // fonceur sur la ligne
+    this.addEnemy(9080, 1650, 8940, 9260, { hp: 2 }); // avant la dernière tour
   }
 
-  addEnemy(x, platformTop, minX, maxX, hp) {
-    const e = new Enemy(this, x, platformTop - ENEMY.HEIGHT / 2, { minX, maxX, hp });
+  addEnemy(x, platformTop, minX, maxX, opts = {}) {
+    const e = new Enemy(this, x, platformTop - ENEMY.HEIGHT / 2, { minX, maxX, ...opts });
     this.enemies.push(e);
     return e;
   }
@@ -419,8 +420,8 @@ export default class LevelScene extends Phaser.Scene {
     this.enemies = this.enemies.filter((e) => e.active);
 
     // --- Projectiles (lancer + durée de vie) ---
-    if (this.input_.isRangedJustPressed() && this.player.rangedCooldown <= 0) {
-      this.player.rangedCooldown = PLAYER.RANGED_COOLDOWN;
+    if (this.input_.isRangedJustPressed() && this.player.canThrow()) {
+      this.player.consumeAmmo();
       this.spawnProjectile();
     }
     for (const [body, p] of this.projectiles) {

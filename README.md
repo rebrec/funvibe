@@ -58,9 +58,13 @@ Une scène jouable pour valider le « feel » du déplacement :
 
 - **Ennemis** (carrés rouges) qui patrouillent sur leurs plateformes.
 - **Frappe** au corps-à-corps (`J` / `X`) : zone d'attaque devant le héros.
-- **Lancer** à distance (`K` / `L`) : un shuriken file devant le héros, touche les
-  ennemis et disparaît au contact d'un mur (prototype de variété d'attaques).
-- Ennemis avec **PV** (1 ou 2 coups), sauts occasionnels, ils se traversent entre eux.
+- **Lancer** à distance (`K` / `L`) : shuriken qui file devant le héros, touche les
+  ennemis et disparaît sur un mur. **Stock limité (5) qui se régénère** dans le temps
+  (compteur dans le HUD) — pas de tir en continu. Stock max / vitesse de recharge /
+  cadence sont des stats évolutives (futures améliorations).
+- Ennemis : **PV** (1-2 coups), se traversent entre eux. Deux comportements —
+  **marcheur** (patrouille + sauts) et **fonceur** (avance, s'arrête en clignotant,
+  puis charge brutalement).
 - **Vie** affichée en cœurs (haut-gauche). Contact d'un ennemi = -1 cœur, avec
   **invincibilité brève + recul + clignotement**. À 0 cœur : réapparition au départ.
 - La vie n'est PAS persistée (repart au max à chaque session / réapparition) ;

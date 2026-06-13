@@ -28,6 +28,11 @@ export default class UIScene extends Phaser.Scene {
     this.crystalText = this.add.text(right - 132, 76, '0', textStyle).setOrigin(0, 0.5);
     this.crystalText.setShadow(1, 1, '#00000088', 2);
 
+    // Ligne shurikens (stock régénératif)
+    this.add.image(right - 150, 118, 'shuriken');
+    this.ammoText = this.add.text(right - 132, 118, '0', textStyle).setOrigin(0, 0.5);
+    this.ammoText.setShadow(1, 1, '#00000088', 2);
+
     // Cœurs (vie) en haut à gauche
     this.hearts = [];
     const max = this.registry.get('maxHealth') ?? PLAYER.MAX_HEALTH;
@@ -48,12 +53,15 @@ export default class UIScene extends Phaser.Scene {
   }
 
   onChange(parent, key) {
-    if (key === 'coins' || key === 'crystals' || key === 'health') this.refresh();
+    if (['coins', 'crystals', 'health', 'ammo', 'maxAmmo'].includes(key)) this.refresh();
   }
 
   refresh() {
     this.coinText.setText(`${this.registry.get('coins') ?? 0}`);
     this.crystalText.setText(`${this.registry.get('crystals') ?? 0}`);
+    const ammo = this.registry.get('ammo') ?? 0;
+    const maxAmmo = this.registry.get('maxAmmo') ?? PLAYER.RANGED_MAX_AMMO;
+    this.ammoText.setText(`${ammo}/${maxAmmo}`);
     const hp = this.registry.get('health') ?? 0;
     this.hearts.forEach((h, i) => h.setAlpha(i < hp ? 1 : 0.25));
   }
