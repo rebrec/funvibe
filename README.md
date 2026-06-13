@@ -32,7 +32,16 @@ Une scène jouable pour valider le « feel » du déplacement :
 - **coyote time** (on peut sauter juste après avoir quitté un bord),
 - **jump buffering** (un appui juste avant l'atterrissage est mémorisé),
 - **hauteur de saut variable** (relâcher tôt = saut plus court),
-- caméra qui suit, niveau plus large que l'écran, trou à franchir.
+- caméra qui suit (horizontale **et verticale**),
+- **grand niveau non-linéaire** (droite → tour d'escalade → gauche en hauteur → descente → repère),
+- **pentes** (douces et escarpées, dans les deux sens) sur lesquelles le héros marche
+  plus lentement en montée, plus un trou à franchir.
+
+> Physique : **Matter.js** (gère nativement pentes et terrains complexes). Le
+> mouvement est piloté à la main (vitesse) pour garder un "feel" précis : sur une
+> pente le héros suit la tangente de la surface. Réglages dans `src/core/Constants.js`
+> (valeurs de premier jet, à affiner au ressenti). Mettre `debug: true` dans
+> `src/main.js` pour visualiser les corps physiques.
 
 **Commandes** : Flèches / `A`-`D` pour se déplacer, `Espace` / `↑` / `W` pour sauter.
 

@@ -15,10 +15,10 @@ const config = {
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
   physics: {
-    default: 'arcade',
-    arcade: {
+    default: 'matter',
+    matter: {
       gravity: { y: PHYSICS.GRAVITY_Y },
-      debug: false,
+      debug: false, // passer à true pour visualiser les corps physiques
     },
   },
   scene: [BootScene, LevelScene],

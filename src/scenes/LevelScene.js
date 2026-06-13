@@ -3,12 +3,34 @@ import { GAME } from '../core/Constants.js';
 import InputManager from '../core/InputManager.js';
 import Player from '../entities/Player.js';
 
-// M0 — Validation des sensations de plateforme : course, saut, double-saut,
-// coyote time, jump buffering, hauteur de saut variable, caméra qui suit.
-// Décor en placeholders (rectangles colorés), niveau plus large que l'écran.
+// M0 — Sensations de plateforme sous Matter.js : niveau LONG (type Sonic/Donkey
+// Kong), avec verticalité, sections en hauteur et pentes (dans les deux sens).
+// Le tracé avance toujours vers la droite et ne se recoupe jamais (pas de pentes
+// qui se croisent par accident).
 
-const WORLD_WIDTH = 2600;
-const WORLD_HEIGHT = GAME.HEIGHT;
+const WORLD_WIDTH = 12000;
+const WORLD_HEIGHT = 2200;
+
+const START = { x: 120, y: 1720 };
+const DEATH_Y = WORLD_HEIGHT - 20;
+
+const COL = {
+  ground: 0x6b4f2a,
+  plat: 0x8a8f98,
+  slope: 0x7a5a30,
+  landmark: 0xc06be0,
+};
+
+const PLATFORM_THICKNESS = 28;
+const SLOPE_THICKNESS = 44;
+
+// Décalage de la caméra dans le sens du déplacement (anticipation).
+// Horizontal : voir plus loin devant. Vertical : voir plus haut en montant /
+// plus bas en descendant (transition plus douce pour ne pas suivre chaque saut).
+const CAM_LOOKAHEAD_X = 220;
+const CAM_LOOKAHEAD_X_LERP = 0.04;
+const CAM_LOOKAHEAD_Y = 160;
+const CAM_LOOKAHEAD_Y_LERP = 0.03;
 
 export default class LevelScene extends Phaser.Scene {
   constructor() {
@@ -16,58 +38,131 @@ export default class LevelScene extends Phaser.Scene {
   }
 
   create() {
-    this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    this.matter.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT, 128, true, true, true, false);
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
     this.cameras.main.setBackgroundColor(GAME.BACKGROUND);
 
-    this.platforms = [];
     this.input_ = new InputManager(this);
 
-    // Sol principal (avec un trou pour tester les sauts au-dessus du vide).
-    this.addPlatform(0, WORLD_HEIGHT - 32, 760, 32, 0x6b4f2a);
-    this.addPlatform(920, WORLD_HEIGHT - 32, WORLD_WIDTH - 920, 32, 0x6b4f2a);
+    this.buildLevel();
 
-    // Plateformes flottantes, hauteurs croissantes.
-    this.addPlatform(360, 420, 160, 24, 0x8a8f98);
-    this.addPlatform(620, 340, 140, 24, 0x8a8f98);
-    this.addPlatform(900, 300, 120, 24, 0x8a8f98);
-    this.addPlatform(1160, 380, 180, 24, 0x8a8f98);
-    this.addPlatform(1480, 300, 140, 24, 0x8a8f98);
-    this.addPlatform(1720, 220, 120, 24, 0x8a8f98);
-
-    // Escalier de petites marches pour tester la précision.
-    this.addPlatform(2000, 440, 90, 24, 0x8a8f98);
-    this.addPlatform(2150, 380, 90, 24, 0x8a8f98);
-    this.addPlatform(2300, 320, 90, 24, 0x8a8f98);
-
-    // Plateforme "haute" (atteignable au double-saut depuis la marche du haut) :
-    // préfigure les zones bloquées par une compétence (cf. jalons M3/M4).
-    this.addPlatform(2420, 180, 140, 24, 0xc06be0);
-
-    // Joueur
-    this.player = new Player(this, 120, WORLD_HEIGHT - 120);
-    this.physics.add.collider(this.player, this.platforms);
-
-    // Caméra suit le joueur en douceur.
+    this.player = new Player(this, START.x, START.y);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
-    this.cameras.main.setDeadzone(120, 120);
+    this.cameras.main.setDeadzone(160, 180);
+    this.camLookaheadX = 0;
+    this.camLookaheadY = 0;
 
     this.createHelpOverlay();
   }
 
-  addPlatform(x, y, width, height, color) {
-    // Rectangle avec corps statique (placeholder, pas de texture nécessaire).
-    const rect = this.add.rectangle(x + width / 2, y + height / 2, width, height, color);
-    this.physics.add.existing(rect, true);
-    this.platforms.push(rect);
+  buildLevel() {
+    // --- A. Départ + petite montée par plateformes ---
+    this.addPlatform(0, 1800, 700, COL.ground);
+    this.addSlope(700, 1800, 1000, 1650); // pente douce
+    this.addPlatform(1000, 1650, 200, COL.plat);
+    this.addPlatform(1300, 1650, 180, COL.plat);
+    this.addPlatform(1560, 1560, 160, COL.plat);
+    this.addPlatform(1800, 1470, 160, COL.plat);
+    this.addPlatform(2040, 1470, 200, COL.plat);
+    this.addSlope(2240, 1470, 2520, 1650); // redescente
+    this.addPlatform(2520, 1650, 260, COL.plat);
+
+    // --- B. Trou, puis pente raide et tour d'escalade ---
+    this.addPlatform(2960, 1700, 240, COL.plat); // après le trou
+    this.addSlope(3200, 1700, 3380, 1450); // pente raide
+    this.addPlatform(3380, 1450, 200, COL.plat);
+    // tour en quinconce (sauts / double-sauts), écarts réguliers ~110 px
+    this.addPlatform(3640, 1340, 150, COL.plat);
+    this.addPlatform(3880, 1230, 150, COL.plat);
+    this.addPlatform(3640, 1120, 150, COL.plat);
+    this.addPlatform(3880, 1010, 150, COL.plat);
+    this.addPlatform(3640, 900, 150, COL.plat);
+    this.addPlatform(3860, 790, 320, COL.plat); // palier sommet
+
+    // --- C. Longue section EN HAUTEUR, puis descente par pentes ---
+    this.addPlatform(4260, 790, 200, COL.plat);
+    this.addPlatform(4560, 850, 180, COL.plat);
+    this.addPlatform(4840, 790, 180, COL.plat);
+    this.addSlope(5100, 790, 5400, 1050); // descente
+    this.addPlatform(5400, 1050, 300, COL.plat);
+    this.addPlatform(5760, 1150, 220, COL.plat);
+    this.addSlope(5980, 1150, 6300, 1400); // descente
+    this.addPlatform(6300, 1400, 360, COL.plat);
+    this.addPlatform(6720, 1500, 260, COL.plat);
+
+    // --- D. Longue ligne au sol (section "vitesse") avec collines ---
+    this.addPlatform(7040, 1600, 900, COL.ground);
+    this.addSlope(7940, 1600, 8300, 1450); // colline (montée douce)
+    this.addPlatform(8300, 1450, 200, COL.plat);
+    this.addSlope(8540, 1450, 8900, 1650); // redescente
+    this.addPlatform(8900, 1650, 400, COL.ground);
+
+    // --- E. Trou, dernière tour, et repère final ---
+    this.addPlatform(9420, 1650, 260, COL.plat);
+    this.addPlatform(9700, 1540, 150, COL.plat);
+    this.addPlatform(9940, 1430, 150, COL.plat);
+    this.addPlatform(9700, 1320, 150, COL.plat);
+    this.addPlatform(9940, 1210, 150, COL.plat);
+    this.addPlatform(9720, 1100, 300, COL.plat);
+    this.addPlatform(10120, 1100, 200, COL.plat);
+    this.addPlatform(10420, 1040, 180, COL.plat);
+    this.addPlatform(10700, 980, 180, COL.plat);
+    this.addPlatform(10980, 900, 240, COL.landmark); // repère final (arrivée du parcours de test)
+    this.addPlatform(11260, 1100, 500, COL.ground);
+
+    this.add
+      .text(11100, 850, 'ARRIVÉE', {
+        fontFamily: 'monospace',
+        fontSize: '22px',
+        color: '#3a1050',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5, 1);
+  }
+
+  // Plateforme horizontale (corps statique Matter + visuel en un objet).
+  addPlatform(x, topY, width, color) {
+    const rect = this.add.rectangle(
+      x + width / 2,
+      topY + PLATFORM_THICKNESS / 2,
+      width,
+      PLATFORM_THICKNESS,
+      color
+    );
+    this.matter.add.gameObject(rect, { isStatic: true, friction: 0, label: 'platform' });
     return rect;
+  }
+
+  // Pente définie par sa ligne de surface (x1,y1)->(x2,y2), x1 < x2.
+  // Corps statique = rectangle pivoté dont le bord supérieur suit la surface.
+  addSlope(x1, y1, x2, y2, color = COL.slope) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx);
+
+    // Normale "vers le bas" (x1<x2 => cos(angle)>0) pour décaler la dalle sous la surface.
+    const ndx = -Math.sin(angle);
+    const ndy = Math.cos(angle);
+    const cx = (x1 + x2) / 2 + (SLOPE_THICKNESS / 2) * ndx;
+    const cy = (y1 + y2) / 2 + (SLOPE_THICKNESS / 2) * ndy;
+
+    this.matter.add.rectangle(cx, cy, len, SLOPE_THICKNESS, {
+      isStatic: true,
+      friction: 0,
+      angle,
+      label: 'slope',
+    });
+
+    const vis = this.add.rectangle(cx, cy, len, SLOPE_THICKNESS, color);
+    vis.setRotation(angle);
   }
 
   createHelpOverlay() {
     const lines = [
-      'M0 — Sensations de plateforme',
+      'M0 — Niveau long (Matter), verticalité & pentes',
       'Flèches / A-D : se déplacer   ·   Espace / ↑ / W : sauter (double-saut)',
-      'Astuce : relâcher le saut tôt = saut plus court',
+      'Avance vers la droite : montées, sections en hauteur, collines, jusqu’au repère violet.',
     ];
     const text = this.add
       .text(16, 14, lines, {
@@ -84,10 +179,25 @@ export default class LevelScene extends Phaser.Scene {
   update(time, delta) {
     this.player.update(delta, this.input_);
 
-    // Filet de sécurité : si on tombe dans un trou, on réapparaît au départ.
-    if (this.player.y > WORLD_HEIGHT + 200) {
+    // Caméra qui anticipe : on se décale dans le sens du déplacement pour voir
+    // davantage devant le joueur (relief, obstacles, adversaires), horizontalement
+    // ET verticalement.
+    const vx = this.player.body.velocity.x;
+    const vy = this.player.body.velocity.y;
+    const dirX = vx > 0.4 ? 1 : vx < -0.4 ? -1 : 0;
+    const dirY = vy > 3 ? 1 : vy < -3 ? -1 : 0;
+    if (dirX !== 0) {
+      this.camLookaheadX = Phaser.Math.Linear(this.camLookaheadX, -dirX * CAM_LOOKAHEAD_X, CAM_LOOKAHEAD_X_LERP);
+    }
+    if (dirY !== 0) {
+      this.camLookaheadY = Phaser.Math.Linear(this.camLookaheadY, -dirY * CAM_LOOKAHEAD_Y, CAM_LOOKAHEAD_Y_LERP);
+    }
+    this.cameras.main.setFollowOffset(this.camLookaheadX, this.camLookaheadY);
+
+    if (this.player.y > DEATH_Y) {
       this.player.setVelocity(0, 0);
-      this.player.setPosition(120, WORLD_HEIGHT - 120);
+      this.player.isGrounded = false;
+      this.player.setPosition(START.x, START.y);
     }
   }
 }
