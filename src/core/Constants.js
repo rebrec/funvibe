@@ -43,4 +43,20 @@ export const PLAYER = {
   // Pente praticable : on considère "sol" un contact dont la normale "vers le haut"
   // a une composante verticale < -SLOPE_MIN_UP (1 = plat ; ~0.5 ≈ jusqu'à 60°).
   SLOPE_MIN_UP: 0.5,
+
+  // Combat / vie
+  MAX_HEALTH: 3,
+  INVINCIBLE_TIME: 1100, // ms d'invincibilité après un coup reçu
+  KNOCKBACK_X: 6,
+  KNOCKBACK_Y: 8,
+  ATTACK_DURATION: 160, // ms où la frappe est active
+  ATTACK_COOLDOWN: 300, // ms entre deux frappes
+  ATTACK_RANGE: 44, // portée de la frappe devant le héros
+};
+
+export const ENEMY = {
+  WIDTH: 40,
+  HEIGHT: 40,
+  COLOR: 0xff5555,
+  SPEED: 1.8, // vitesse de patrouille (unités Matter)
 };

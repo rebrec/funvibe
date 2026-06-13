@@ -39,6 +39,13 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
     this.jumpsRemaining = PLAYER.MAX_JUMPS;
     this.isJumping = false;
 
+    // État combat
+    this.health = PLAYER.MAX_HEALTH;
+    this.invincibleTimer = 0;
+    this.attackTimer = 0; // > 0 => la frappe est active
+    this.attackCooldown = 0;
+    this.facing = 1; // 1 = droite, -1 = gauche
+
     // État sol, renseigné par les événements de collision Matter.
     this.isGrounded = false;
     this.groundNormal = { x: 0, y: -1 };
@@ -68,8 +75,8 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
       else if (pair.bodyB === this.body) other = pair.bodyA;
       else continue;
 
-      // Les capteurs (pièces, cristaux, déclencheurs...) ne sont jamais du sol.
-      if (other.isSensor) continue;
+      // Capteurs (pièces, cristaux...) et ennemis ne sont jamais du sol.
+      if (other.isSensor || other.label === 'enemy') continue;
 
       // Normale orientée du sol vers le joueur ("vers le haut" => y < 0).
       let nx = pair.collision.normal.x;
@@ -108,6 +115,13 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
     if (jumpJustPressed) this.jumpBufferTimer = PLAYER.JUMP_BUFFER;
     else this.jumpBufferTimer = Math.max(0, this.jumpBufferTimer - delta);
 
+    // Timers de combat
+    this.invincibleTimer = Math.max(0, this.invincibleTimer - delta);
+    this.attackTimer = Math.max(0, this.attackTimer - delta);
+    this.attackCooldown = Math.max(0, this.attackCooldown - delta);
+    if (this.invincibleTimer === 0) this.setAlpha(1);
+    if (input.isAttackJustPressed() && this.attackCooldown === 0) this.startAttack();
+
     const vx = body.velocity.x;
     const vy = body.velocity.y;
 
@@ -136,7 +150,10 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
       if (body.velocity.y > PLAYER.MAX_FALL_SPEED) this.setVelocityY(PLAYER.MAX_FALL_SPEED);
     }
 
-    if (axis !== 0) this.setFlipX(axis < 0);
+    if (axis !== 0) {
+      this.setFlipX(axis < 0);
+      this.facing = axis < 0 ? -1 : 1;
+    }
 
     // --- Saut (coyote time + jump buffering + double-saut) ---
     if (this.jumpBufferTimer > 0) {
@@ -162,5 +179,61 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
       this.isJumping = false;
     }
     if (body.velocity.y >= 0) this.isJumping = false;
+  }
+
+  get isAttacking() {
+    return this.attackTimer > 0;
+  }
+
+  get invincible() {
+    return this.invincibleTimer > 0;
+  }
+
+  // Zone de frappe devant le héros (coordonnées monde, centre + taille).
+  getAttackHitbox() {
+    const w = PLAYER.ATTACK_RANGE;
+    const h = PLAYER.HEIGHT;
+    const x = this.x + this.facing * (PLAYER.WIDTH / 2 + w / 2);
+    return { x, y: this.y, w, h };
+  }
+
+  startAttack() {
+    this.attackTimer = PLAYER.ATTACK_DURATION;
+    this.attackCooldown = PLAYER.ATTACK_COOLDOWN;
+
+    // Éclair de frappe (visuel placeholder).
+    const hb = this.getAttackHitbox();
+    const slash = this.scene.add
+      .rectangle(hb.x, hb.y, hb.w, hb.h, 0xffffff, 0.55)
+      .setStrokeStyle(2, 0xffe08a)
+      .setDepth(5);
+    this.scene.tweens.add({
+      targets: slash,
+      alpha: 0,
+      duration: PLAYER.ATTACK_DURATION,
+      onComplete: () => slash.destroy(),
+    });
+  }
+
+  // Reçoit un coup venant de fromX. Renvoie true si le coup a porté.
+  takeDamage(fromX) {
+    if (this.invincibleTimer > 0 || this.health <= 0) return false;
+    this.health -= 1;
+    this.invincibleTimer = PLAYER.INVINCIBLE_TIME;
+    const dir = this.x < fromX ? -1 : 1;
+    this.setIgnoreGravity(false);
+    this.setVelocity(dir * PLAYER.KNOCKBACK_X, -PLAYER.KNOCKBACK_Y);
+    this.scene.tweens.add({ targets: this, alpha: 0.3, duration: 90, yoyo: true, repeat: 5 });
+    return true;
+  }
+
+  respawn(x, y) {
+    this.health = PLAYER.MAX_HEALTH;
+    this.invincibleTimer = 700;
+    this.setIgnoreGravity(false);
+    this.setVelocity(0, 0);
+    this.setAlpha(1);
+    this.isGrounded = false;
+    this.setPosition(x, y);
   }
 }

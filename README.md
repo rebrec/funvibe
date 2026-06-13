@@ -54,6 +54,15 @@ Une scène jouable pour valider le « feel » du déplacement :
 > les re-ramasser. Le suivi « déjà ramassé » par niveau viendra avec le format de
 > données de niveau.
 
+### Jalon M2 (combat de base)
+
+- **Ennemis** (carrés rouges) qui patrouillent sur leurs plateformes.
+- **Frappe** du héros (`J` / `X`) : zone d'attaque devant lui, tue les ennemis touchés.
+- **Vie** affichée en cœurs (haut-gauche). Contact d'un ennemi = -1 cœur, avec
+  **invincibilité brève + recul + clignotement**. À 0 cœur : réapparition au départ.
+- La vie n'est PAS persistée (repart au max à chaque session / réapparition) ;
+  seuls pièces et cristaux le sont.
+
 **Commandes** : Flèches / `A`-`D` pour se déplacer, `Espace` / `↑` / `W` pour sauter.
 
 Tous les réglages du mouvement sont dans `src/core/Constants.js` (à ajuster pour le feel).
@@ -68,12 +77,13 @@ src/
     InputManager.js      abstraction clavier/tactile -> actions
     SaveManager.js      persistance localStorage (pièces, cristaux...)
   entities/
-    Player.js           déplacement, saut, double-saut
+    Player.js           déplacement, saut, double-saut, vie, attaque
+    Enemy.js            ennemi qui patrouille
   scenes/
     BootScene.js        génère les textures + charge la sauvegarde
-    LevelScene.js       le niveau jouable + collectibles
-    UIScene.js          HUD superposé (compteurs)
+    LevelScene.js       le niveau jouable + collectibles + ennemis
+    UIScene.js          HUD superposé (compteurs + cœurs)
 ```
 
-Prochains jalons : combat (M2), hub-village + boutique (M3),
+Prochains jalons : hub-village + boutique (M3),
 portes & gating (M4), boss (M5), personnages & maîtrises (M6).

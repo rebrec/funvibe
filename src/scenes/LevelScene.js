@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
-import { GAME } from '../core/Constants.js';
+import { GAME, PLAYER, ENEMY } from '../core/Constants.js';
 import InputManager from '../core/InputManager.js';
 import Player from '../entities/Player.js';
+import Enemy from '../entities/Enemy.js';
 import SaveManager from '../core/SaveManager.js';
 
 // M0 — Sensations de plateforme sous Matter.js : niveau LONG (type Sonic/Donkey
@@ -45,15 +46,21 @@ export default class LevelScene extends Phaser.Scene {
 
     this.input_ = new InputManager(this);
     this.collectibles = new Map(); // body Matter -> { vis, type }
+    this.enemies = [];
 
     this.buildLevel();
     this.buildCollectibles();
+    this.buildEnemies();
 
     this.player = new Player(this, START.x, START.y);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
     this.cameras.main.setDeadzone(160, 180);
     this.camLookaheadX = 0;
     this.camLookaheadY = 0;
+
+    // Vie initiale (non persistée : repart au max à chaque session/réapparition).
+    this.registry.set('maxHealth', PLAYER.MAX_HEALTH);
+    this.registry.set('health', this.player.health);
 
     this.createHelpOverlay();
 
@@ -267,16 +274,43 @@ export default class LevelScene extends Phaser.Scene {
     }
   }
 
+  // --- Ennemis ---
+  buildEnemies() {
+    this.addEnemy(460, 1800, 320, 600); // sol de départ
+    this.addEnemy(3470, 1450, 3400, 3540); // palier après la pente raide
+    this.addEnemy(6480, 1400, 6340, 6620); // section descente
+    this.addEnemy(7300, 1600, 7100, 7600); // ligne de vitesse
+    this.addEnemy(7700, 1600, 7620, 7900);
+    this.addEnemy(9080, 1650, 8940, 9260); // avant la dernière tour
+  }
+
+  addEnemy(x, platformTop, minX, maxX) {
+    const e = new Enemy(this, x, platformTop - ENEMY.HEIGHT / 2, { minX, maxX });
+    this.enemies.push(e);
+    return e;
+  }
+
+  // Recouvrement de deux rectangles définis par leur centre + taille.
+  static overlap(ax, ay, aw, ah, bx, by, bw, bh) {
+    return (
+      Math.abs(ax - bx) < (aw + bw) / 2 && Math.abs(ay - by) < (ah + bh) / 2
+    );
+  }
+
+  respawnPlayer() {
+    this.player.respawn(START.x, START.y);
+    this.registry.set('health', this.player.health);
+  }
+
   createHelpOverlay() {
     const lines = [
-      'M1 — Niveau long + collecte (pièces & cristaux)',
       'Flèches / A-D : se déplacer   ·   Espace / ↑ / W : sauter (double-saut)',
-      'Ramasse les pièces (jaunes) et cristaux (cyan) ; compteurs en haut à droite.',
+      'J / X : frapper   ·   ramasse pièces & cristaux   ·   évite ou tue les ennemis rouges',
     ];
     const text = this.add
-      .text(16, 14, lines, {
+      .text(16, GAME.HEIGHT - 52, lines, {
         fontFamily: 'monospace',
-        fontSize: '16px',
+        fontSize: '15px',
         color: '#0a2233',
         lineSpacing: 4,
       })
@@ -303,6 +337,36 @@ export default class LevelScene extends Phaser.Scene {
     }
     this.cameras.main.setFollowOffset(this.camLookaheadX, this.camLookaheadY);
 
+    // --- Ennemis & combat ---
+    for (const e of this.enemies) e.update();
+
+    if (this.player.isAttacking) {
+      const hb = this.player.getAttackHitbox();
+      for (const e of this.enemies) {
+        if (e.alive && LevelScene.overlap(hb.x, hb.y, hb.w, hb.h, e.x, e.y, ENEMY.WIDTH, ENEMY.HEIGHT)) {
+          e.kill();
+        }
+      }
+    }
+
+    if (!this.player.invincible) {
+      for (const e of this.enemies) {
+        if (
+          e.alive &&
+          LevelScene.overlap(this.player.x, this.player.y, PLAYER.WIDTH, PLAYER.HEIGHT, e.x, e.y, ENEMY.WIDTH, ENEMY.HEIGHT)
+        ) {
+          if (this.player.takeDamage(e.x)) {
+            this.registry.set('health', this.player.health);
+            if (this.player.health <= 0) this.respawnPlayer();
+          }
+          break;
+        }
+      }
+    }
+
+    this.enemies = this.enemies.filter((e) => e.active);
+
+    // Chute dans le vide : on réapparaît au départ (sans perdre de vie).
     if (this.player.y > DEATH_Y) {
       this.player.setVelocity(0, 0);
       this.player.isGrounded = false;

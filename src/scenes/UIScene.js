@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GAME } from '../core/Constants.js';
+import { GAME, PLAYER } from '../core/Constants.js';
 
 // HUD superposé (scène parallèle au niveau). Affiche les compteurs de pièces et
 // de cristaux. Les valeurs vivent dans le registre global (this.registry), mis à
@@ -28,6 +28,17 @@ export default class UIScene extends Phaser.Scene {
     this.crystalText = this.add.text(right - 132, 76, '0', textStyle).setOrigin(0, 0.5);
     this.crystalText.setShadow(1, 1, '#00000088', 2);
 
+    // Cœurs (vie) en haut à gauche
+    this.hearts = [];
+    const max = this.registry.get('maxHealth') ?? PLAYER.MAX_HEALTH;
+    for (let i = 0; i < max; i++) {
+      const h = this.add
+        .text(26 + i * 32, 34, '♥', { fontFamily: 'monospace', fontSize: '30px', color: '#ff5566' })
+        .setOrigin(0, 0.5);
+      h.setShadow(1, 1, '#00000088', 2);
+      this.hearts.push(h);
+    }
+
     this.refresh();
 
     this.registry.events.on('changedata', this.onChange, this);
@@ -37,11 +48,13 @@ export default class UIScene extends Phaser.Scene {
   }
 
   onChange(parent, key) {
-    if (key === 'coins' || key === 'crystals') this.refresh();
+    if (key === 'coins' || key === 'crystals' || key === 'health') this.refresh();
   }
 
   refresh() {
     this.coinText.setText(`${this.registry.get('coins') ?? 0}`);
     this.crystalText.setText(`${this.registry.get('crystals') ?? 0}`);
+    const hp = this.registry.get('health') ?? 0;
+    this.hearts.forEach((h, i) => h.setAlpha(i < hp ? 1 : 0.25));
   }
 }
