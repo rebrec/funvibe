@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { PLAYER } from '../core/Constants.js';
+import SaveManager from '../core/SaveManager.js';
 
 // Génère les textures "placeholder" (formes colorées) puis lance le niveau.
 // Aucun asset externe pour la maquette : tout est dessiné par code.
@@ -17,6 +18,11 @@ export default class BootScene extends Phaser.Scene {
     g.fillCircle(PLAYER.WIDTH - 10, 14, 5); // "oeil" côté droit (sens par défaut)
     g.generateTexture('player', PLAYER.WIDTH, PLAYER.HEIGHT);
     g.destroy();
+
+    // Charge la sauvegarde dans le registre global (lu par le HUD et le jeu).
+    const save = SaveManager.load();
+    this.registry.set('coins', save.coins);
+    this.registry.set('crystals', save.crystals);
 
     this.scene.start('LevelScene');
   }

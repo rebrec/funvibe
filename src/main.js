@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME, PHYSICS } from './core/Constants.js';
 import BootScene from './scenes/BootScene.js';
 import LevelScene from './scenes/LevelScene.js';
+import UIScene from './scenes/UIScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -21,7 +22,7 @@ const config = {
       debug: false, // passer à true pour visualiser les corps physiques
     },
   },
-  scene: [BootScene, LevelScene],
+  scene: [BootScene, LevelScene, UIScene],
 };
 
 // eslint-disable-next-line no-new

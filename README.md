@@ -43,6 +43,17 @@ Une scène jouable pour valider le « feel » du déplacement :
 > (valeurs de premier jet, à affiner au ressenti). Mettre `debug: true` dans
 > `src/main.js` pour visualiser les corps physiques.
 
+### Jalon M1 (collecte & HUD)
+
+- **Pièces** (cercles jaunes) et **cristaux** (losanges cyan) à ramasser dans le niveau.
+- **HUD** en haut à droite avec les deux compteurs (`UIScene`, scène superposée).
+- **Persistance** via `localStorage` (`SaveManager`) : les totaux survivent au rechargement.
+
+> Limite connue (acceptable au stade maquette) : au rechargement, les collectibles
+> réapparaissent dans le niveau alors que les totaux persistent — on pourra donc
+> les re-ramasser. Le suivi « déjà ramassé » par niveau viendra avec le format de
+> données de niveau.
+
 **Commandes** : Flèches / `A`-`D` pour se déplacer, `Espace` / `↑` / `W` pour sauter.
 
 Tous les réglages du mouvement sont dans `src/core/Constants.js` (à ajuster pour le feel).
@@ -55,12 +66,14 @@ src/
   core/
     Constants.js        réglages (gravité, vitesses, saut...)
     InputManager.js      abstraction clavier/tactile -> actions
+    SaveManager.js      persistance localStorage (pièces, cristaux...)
   entities/
     Player.js           déplacement, saut, double-saut
   scenes/
-    BootScene.js        génère les textures placeholder
-    LevelScene.js       le niveau de test M0
+    BootScene.js        génère les textures + charge la sauvegarde
+    LevelScene.js       le niveau jouable + collectibles
+    UIScene.js          HUD superposé (compteurs)
 ```
 
-Prochains jalons : collecte & HUD (M1), combat (M2), hub-village + boutique (M3),
+Prochains jalons : combat (M2), hub-village + boutique (M3),
 portes & gating (M4), boss (M5), personnages & maîtrises (M6).

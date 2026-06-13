@@ -68,6 +68,9 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
       else if (pair.bodyB === this.body) other = pair.bodyA;
       else continue;
 
+      // Les capteurs (pièces, cristaux, déclencheurs...) ne sont jamais du sol.
+      if (other.isSensor) continue;
+
       // Normale orientée du sol vers le joueur ("vers le haut" => y < 0).
       let nx = pair.collision.normal.x;
       let ny = pair.collision.normal.y;

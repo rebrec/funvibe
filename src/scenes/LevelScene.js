@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME } from '../core/Constants.js';
 import InputManager from '../core/InputManager.js';
 import Player from '../entities/Player.js';
+import SaveManager from '../core/SaveManager.js';
 
 // M0 — Sensations de plateforme sous Matter.js : niveau LONG (type Sonic/Donkey
 // Kong), avec verticalité, sections en hauteur et pentes (dans les deux sens).
@@ -43,8 +44,10 @@ export default class LevelScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(GAME.BACKGROUND);
 
     this.input_ = new InputManager(this);
+    this.collectibles = new Map(); // body Matter -> { vis, type }
 
     this.buildLevel();
+    this.buildCollectibles();
 
     this.player = new Player(this, START.x, START.y);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
@@ -53,6 +56,13 @@ export default class LevelScene extends Phaser.Scene {
     this.camLookaheadY = 0;
 
     this.createHelpOverlay();
+
+    // HUD (scène parallèle) + ramassage des collectibles.
+    this.scene.launch('UIScene');
+    this.matter.world.on('collisionstart', this.onCollect, this);
+    this.events.once('shutdown', () => {
+      this.matter.world.off('collisionstart', this.onCollect, this);
+    });
   }
 
   buildLevel() {
@@ -158,11 +168,99 @@ export default class LevelScene extends Phaser.Scene {
     vis.setRotation(angle);
   }
 
+  // --- Collectibles : pièces (jaunes) et cristaux (cyan) ---
+  // Disposés au-dessus du parcours. Corps capteur Matter (détection) + visuel
+  // séparé (animé librement, sans interférer avec la physique).
+  buildCollectibles() {
+    // Pièces
+    this.addCoinRow(220, 1750, 5, 60);
+    this.addCoinRow(1340, 1610, 2, 60);
+    this.addCoin(1610, 1520);
+    this.addCoin(1870, 1430);
+    this.addCoinRow(2080, 1430, 2, 80);
+    // tour B
+    this.addCoin(3700, 1300);
+    this.addCoin(3940, 1190);
+    this.addCoin(3700, 1080);
+    this.addCoin(3940, 970);
+    this.addCoin(3700, 860);
+    this.addCoinRow(3940, 750, 2, 100);
+    // section haute C
+    this.addCoin(4320, 750);
+    this.addCoin(4620, 810);
+    this.addCoinRow(5480, 1010, 2, 80);
+    this.addCoin(5820, 1110);
+    this.addCoinRow(6380, 1360, 2, 100);
+    this.addCoin(6800, 1460);
+    // section vitesse D
+    this.addCoinRow(7140, 1560, 8, 90);
+    this.addCoinRow(8980, 1610, 2, 100);
+    // section E (tour + finale)
+    this.addCoin(9480, 1610);
+    this.addCoin(9760, 1500);
+    this.addCoin(10000, 1390);
+    this.addCoin(9760, 1280);
+    this.addCoin(10000, 1170);
+    this.addCoinRow(9800, 1060, 2, 100);
+    this.addCoin(10480, 1000);
+    this.addCoin(10760, 940);
+    this.addCoinRow(11040, 860, 2, 60);
+
+    // Cristaux (rares, points marquants / un peu plus durs à atteindre)
+    this.addCrystal(4040, 740);
+    this.addCrystal(4920, 740);
+    this.addCrystal(8380, 1380);
+    this.addCrystal(9870, 1050);
+    this.addCrystal(11100, 830);
+  }
+
+  addCoinRow(x, y, count, step) {
+    for (let i = 0; i < count; i++) this.addCoin(x + i * step, y);
+  }
+
+  addCoin(x, y) {
+    const body = this.matter.add.circle(x, y, 12, { isStatic: true, isSensor: true, label: 'coin' });
+    const vis = this.add.circle(x, y, 11, 0xffd23f).setStrokeStyle(2, 0xb8860b);
+    this.collectibles.set(body, { vis, type: 'coin' });
+    this.tweens.add({ targets: vis, scale: 1.18, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+
+  addCrystal(x, y) {
+    const body = this.matter.add.rectangle(x, y, 22, 22, { isStatic: true, isSensor: true, label: 'crystal' });
+    const vis = this.add.rectangle(x, y, 18, 18, 0x49e0e0).setStrokeStyle(2, 0x1f8a8a).setRotation(Math.PI / 4);
+    this.collectibles.set(body, { vis, type: 'crystal' });
+    this.tweens.add({ targets: vis, angle: '+=360', duration: 3200, repeat: -1 });
+  }
+
+  onCollect(event) {
+    for (const pair of event.pairs) {
+      let other = null;
+      if (pair.bodyA === this.player.body) other = pair.bodyB;
+      else if (pair.bodyB === this.player.body) other = pair.bodyA;
+      else continue;
+
+      const entry = this.collectibles.get(other);
+      if (!entry) continue;
+
+      this.collectibles.delete(other);
+      this.matter.world.remove(other);
+      this.tweens.killTweensOf(entry.vis);
+      entry.vis.destroy();
+
+      const key = entry.type === 'crystal' ? 'crystals' : 'coins';
+      this.registry.inc(key, 1);
+      SaveManager.save({
+        coins: this.registry.get('coins'),
+        crystals: this.registry.get('crystals'),
+      });
+    }
+  }
+
   createHelpOverlay() {
     const lines = [
-      'M0 — Niveau long (Matter), verticalité & pentes',
+      'M1 — Niveau long + collecte (pièces & cristaux)',
       'Flèches / A-D : se déplacer   ·   Espace / ↑ / W : sauter (double-saut)',
-      'Avance vers la droite : montées, sections en hauteur, collines, jusqu’au repère violet.',
+      'Ramasse les pièces (jaunes) et cristaux (cyan) ; compteurs en haut à droite.',
     ];
     const text = this.add
       .text(16, 14, lines, {
