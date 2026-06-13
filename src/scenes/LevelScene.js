@@ -282,11 +282,13 @@ export default class LevelScene extends Phaser.Scene {
 
   // --- Ennemis ---
   buildEnemies() {
-    this.addEnemy(460, 1800, 320, 600, { hp: 1 }); // marcheur, sol de départ
-    this.addEnemy(3470, 1450, 3400, 3540, { hp: 2 }); // marcheur coriace
-    this.addEnemy(6480, 1400, 6340, 6620, { hp: 1 });
-    this.addEnemy(7350, 1600, 7100, 7850, { hp: 2, behavior: 'charger' }); // fonceur sur la ligne
-    this.addEnemy(9080, 1650, 8940, 9260, { hp: 2 }); // avant la dernière tour
+    // Difficulté croissante : tués vite au début, de plus en plus coriaces ensuite.
+    this.addEnemy(460, 1800, 320, 600, { hp: 1 }); // début : meurt vite
+    this.addEnemy(3470, 1450, 3400, 3540, { hp: 2 });
+    this.addEnemy(6480, 1400, 6340, 6620, { hp: 3 });
+    this.addEnemy(7350, 1600, 7100, 7850, { hp: 3, behavior: 'charger' }); // fonceur coriace
+    this.addEnemy(9080, 1650, 8940, 9260, { hp: 4 }); // costaud avant la dernière tour
+    this.addEnemy(11400, 1100, 11280, 11700, { hp: 4 }); // costaud près de l'arrivée
   }
 
   addEnemy(x, platformTop, minX, maxX, opts = {}) {

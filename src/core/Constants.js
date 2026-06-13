@@ -58,7 +58,7 @@ export const PLAYER = {
   // ou réduire la cadence).
   RANGED_COOLDOWN: 480, // ms entre deux lancers (plus lent par défaut)
   RANGED_MAX_AMMO: 5, // stock de shurikens
-  RANGED_REGEN: 1100, // ms pour régénérer 1 shuriken
+  RANGED_REGEN: 2600, // ms pour régénérer 1 shuriken (assez lent : le stock est une vraie ressource)
 };
 
 export const PROJECTILE = {
@@ -87,7 +87,7 @@ export const ENEMY = {
     TELEGRAPH_TIME: 320, // ms de clignotement en fin de pause
     DASH_TIME: 600, // ms de charge
     DASH_START_SPEED: 2,
-    DASH_ACCEL: 1.1, // multiplicateur de vitesse par frame (~exponentiel)
-    DASH_MAX_SPEED: 13,
+    DASH_ACCEL: 1.08, // multiplicateur de vitesse par frame (~exponentiel)
+    DASH_MAX_SPEED: 9,
   },
 };
