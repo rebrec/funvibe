@@ -172,50 +172,62 @@ export default class LevelScene extends Phaser.Scene {
   // Disposés au-dessus du parcours. Corps capteur Matter (détection) + visuel
   // séparé (animé librement, sans interférer avec la physique).
   buildCollectibles() {
-    // Pièces
-    this.addCoinRow(220, 1750, 5, 60);
-    this.addCoinRow(1340, 1610, 2, 60);
-    this.addCoin(1610, 1520);
-    this.addCoin(1870, 1430);
-    this.addCoinRow(2080, 1430, 2, 80);
-    // tour B
-    this.addCoin(3700, 1300);
-    this.addCoin(3940, 1190);
-    this.addCoin(3700, 1080);
-    this.addCoin(3940, 970);
-    this.addCoin(3700, 860);
-    this.addCoinRow(3940, 750, 2, 100);
-    // section haute C
-    this.addCoin(4320, 750);
-    this.addCoin(4620, 810);
-    this.addCoinRow(5480, 1010, 2, 80);
-    this.addCoin(5820, 1110);
-    this.addCoinRow(6380, 1360, 2, 100);
-    this.addCoin(6800, 1460);
-    // section vitesse D
-    this.addCoinRow(7140, 1560, 8, 90);
-    this.addCoinRow(8980, 1610, 2, 100);
-    // section E (tour + finale)
-    this.addCoin(9480, 1610);
-    this.addCoin(9760, 1500);
-    this.addCoin(10000, 1390);
-    this.addCoin(9760, 1280);
-    this.addCoin(10000, 1170);
-    this.addCoinRow(9800, 1060, 2, 100);
-    this.addCoin(10480, 1000);
-    this.addCoin(10760, 940);
-    this.addCoinRow(11040, 860, 2, 60);
+    // --- Pièces POSÉES sur le sol (sur le chemin, faciles à ramasser) ---
+    this.groundCoinRow(220, 1800, 5, 60); // sol de départ
+    this.groundCoinRow(1020, 1650, 3, 60); // palier
+    this.groundCoinRow(2080, 1470, 2, 80);
+    this.groundCoinRow(2560, 1650, 3, 70);
+    this.groundCoin(3700, 1340); // paliers de la tour B
+    this.groundCoin(3940, 1230);
+    this.groundCoin(3700, 1120);
+    this.groundCoin(3940, 1010);
+    this.groundCoin(3700, 900);
+    this.groundCoinRow(3880, 790, 3, 80); // sommet de tour
+    this.groundCoin(4320, 790); // section haute C
+    this.groundCoin(4620, 850);
+    this.groundCoin(4920, 790);
+    this.groundCoinRow(5460, 1050, 2, 90);
+    this.groundCoin(6400, 1400);
+    this.groundCoinRow(7120, 1600, 9, 90); // longue ligne "vitesse"
+    this.groundCoinRow(8920, 1650, 4, 80);
+    this.groundCoin(9760, 1540); // tour E
+    this.groundCoin(10000, 1430);
+    this.groundCoin(9760, 1320);
+    this.groundCoin(10000, 1210);
+    this.groundCoinRow(11280, 1100, 4, 70); // après l'arrivée
 
-    // Cristaux (rares, points marquants / un peu plus durs à atteindre)
-    this.addCrystal(4040, 740);
-    this.addCrystal(4920, 740);
-    this.addCrystal(8380, 1380);
-    this.addCrystal(9870, 1050);
-    this.addCrystal(11100, 830);
+    // --- Pièces EN L'AIR (récompense d'un saut bien ajusté) ---
+    this.addCoin(2820, 1600); // arc au-dessus du 1er trou
+    this.addCoin(2870, 1555);
+    this.addCoin(2920, 1600);
+    this.addCoin(3760, 1250); // apex entre paliers de la tour B
+    this.addCoin(3760, 1030);
+    this.addCoin(7500, 1470); // saut au-dessus de la ligne de vitesse
+    this.addCoin(7600, 1470);
+    this.addCoin(9340, 1600); // arc au-dessus du 2e trou
+    this.addCoin(9380, 1600);
+    this.addCoin(10300, 940); // apex vers l'arrivée
+    this.addCoin(10580, 880);
+
+    // --- Cristaux : un mélange posé / en l'air ---
+    this.groundCrystal(4040, 790); // posé au sommet de la tour
+    this.addCrystal(4920, 690); // en l'air au-dessus de la section haute (saut)
+    this.addCrystal(2870, 1490); // en l'air, apex du saut au-dessus du trou
+    this.groundCrystal(9870, 1100); // posé au sommet de la dernière tour
+    this.groundCrystal(11100, 900); // posé près de l'ARRIVÉE
   }
 
-  addCoinRow(x, y, count, step) {
-    for (let i = 0; i < count; i++) this.addCoin(x + i * step, y);
+  // Pose un objet sur le dessus d'une plateforme (platformTop = Y de la surface).
+  groundCoin(x, platformTop) {
+    this.addCoin(x, platformTop - 12);
+  }
+
+  groundCoinRow(x, platformTop, count, step) {
+    for (let i = 0; i < count; i++) this.groundCoin(x + i * step, platformTop);
+  }
+
+  groundCrystal(x, platformTop) {
+    this.addCrystal(x, platformTop - 13);
   }
 
   addCoin(x, y) {
