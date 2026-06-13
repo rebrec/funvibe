@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { PLAYER, ENEMY } from '../core/Constants.js';
+import { PLAYER, ENEMY, PROJECTILE } from '../core/Constants.js';
 import SaveManager from '../core/SaveManager.js';
 
 // Génère les textures "placeholder" (formes colorées) puis lance le niveau.
@@ -31,6 +31,24 @@ export default class BootScene extends Phaser.Scene {
     e.fillCircle(24, 16, 2);
     e.generateTexture('enemy', ENEMY.WIDTH, ENEMY.HEIGHT);
     e.destroy();
+
+    // Shuriken : petite étoile à 4 branches (placeholder).
+    const s = this.make.graphics({ x: 0, y: 0, add: false });
+    const size = PROJECTILE.RADIUS * 2 + 4;
+    const c = size / 2;
+    const spikes = 4;
+    const outer = PROJECTILE.RADIUS;
+    const inner = PROJECTILE.RADIUS * 0.38;
+    const pts = [];
+    for (let i = 0; i < spikes * 2; i++) {
+      const r = i % 2 === 0 ? outer : inner;
+      const a = (Math.PI / spikes) * i - Math.PI / 2;
+      pts.push({ x: c + Math.cos(a) * r, y: c + Math.sin(a) * r });
+    }
+    s.fillStyle(PROJECTILE.COLOR, 1);
+    s.fillPoints(pts, true);
+    s.generateTexture('shuriken', size, size);
+    s.destroy();
 
     // Charge la sauvegarde dans le registre global (lu par le HUD et le jeu).
     const save = SaveManager.load();

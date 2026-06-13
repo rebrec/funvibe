@@ -3,6 +3,7 @@ import { GAME, PLAYER, ENEMY } from '../core/Constants.js';
 import InputManager from '../core/InputManager.js';
 import Player from '../entities/Player.js';
 import Enemy from '../entities/Enemy.js';
+import Projectile from '../entities/Projectile.js';
 import SaveManager from '../core/SaveManager.js';
 
 // M0 — Sensations de plateforme sous Matter.js : niveau LONG (type Sonic/Donkey
@@ -47,6 +48,7 @@ export default class LevelScene extends Phaser.Scene {
     this.input_ = new InputManager(this);
     this.collectibles = new Map(); // body Matter -> { vis, type }
     this.enemies = [];
+    this.projectiles = new Map(); // body Matter -> Projectile
 
     this.buildLevel();
     this.buildCollectibles();
@@ -64,11 +66,13 @@ export default class LevelScene extends Phaser.Scene {
 
     this.createHelpOverlay();
 
-    // HUD (scène parallèle) + ramassage des collectibles.
+    // HUD (scène parallèle) + ramassage des collectibles + impacts de projectiles.
     this.scene.launch('UIScene');
     this.matter.world.on('collisionstart', this.onCollect, this);
+    this.matter.world.on('collisionstart', this.onProjectileHit, this);
     this.events.once('shutdown', () => {
       this.matter.world.off('collisionstart', this.onCollect, this);
+      this.matter.world.off('collisionstart', this.onProjectileHit, this);
     });
   }
 
@@ -302,10 +306,53 @@ export default class LevelScene extends Phaser.Scene {
     this.registry.set('health', this.player.health);
   }
 
+  // --- Projectiles (attaque à distance) ---
+  spawnProjectile() {
+    const dir = this.player.facing;
+    const x = this.player.x + dir * (PLAYER.WIDTH / 2 + 10);
+    const y = this.player.y - 4;
+    const p = new Projectile(this, x, y, dir);
+    this.projectiles.set(p.body, p);
+  }
+
+  destroyProjectile(body) {
+    const p = this.projectiles.get(body);
+    if (!p) return;
+    this.projectiles.delete(body);
+    p.destroy();
+  }
+
+  onProjectileHit(event) {
+    for (const pair of event.pairs) {
+      let pBody = null;
+      let other = null;
+      if (this.projectiles.has(pair.bodyA)) {
+        pBody = pair.bodyA;
+        other = pair.bodyB;
+      } else if (this.projectiles.has(pair.bodyB)) {
+        pBody = pair.bodyB;
+        other = pair.bodyA;
+      } else {
+        continue;
+      }
+
+      if (other === this.player.body) continue; // ne se déclenche pas sur le lanceur
+
+      if (other.label === 'enemy') {
+        const enemy = this.enemies.find((e) => e.body === other && e.alive);
+        if (enemy) enemy.takeHit(1);
+      }
+
+      // Disparaît en touchant tout corps solide (ennemi vivant, plateforme, pente).
+      // Traverse les capteurs (pièces, ennemis morts, autres projectiles).
+      if (!other.isSensor) this.destroyProjectile(pBody);
+    }
+  }
+
   createHelpOverlay() {
     const lines = [
       'Flèches / A-D : se déplacer   ·   Espace / ↑ / W : sauter (double-saut)',
-      'J / X : frapper   ·   ramasse pièces & cristaux   ·   évite ou tue les ennemis rouges',
+      'J / X : frapper   ·   K / L : lancer un shuriken   ·   ramasse pièces & cristaux',
     ];
     const text = this.add
       .text(16, GAME.HEIGHT - 52, lines, {
@@ -370,6 +417,16 @@ export default class LevelScene extends Phaser.Scene {
     }
 
     this.enemies = this.enemies.filter((e) => e.active);
+
+    // --- Projectiles (lancer + durée de vie) ---
+    if (this.input_.isRangedJustPressed() && this.player.rangedCooldown <= 0) {
+      this.player.rangedCooldown = PLAYER.RANGED_COOLDOWN;
+      this.spawnProjectile();
+    }
+    for (const [body, p] of this.projectiles) {
+      p.life -= delta;
+      if (p.life <= 0) this.destroyProjectile(body);
+    }
 
     // Chute dans le vide : on réapparaît au départ (sans perdre de vie).
     if (this.player.y > DEATH_Y) {

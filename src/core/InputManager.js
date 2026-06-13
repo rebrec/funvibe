@@ -16,11 +16,12 @@ export default class InputManager {
       right: [kb.addKey('RIGHT'), kb.addKey('D')],
       jump: [kb.addKey('SPACE'), kb.addKey('UP'), kb.addKey('W'), kb.addKey('Z')],
       attack: [kb.addKey('J'), kb.addKey('X')],
+      ranged: [kb.addKey('K'), kb.addKey('L')],
       interact: [kb.addKey('E'), kb.addKey('DOWN'), kb.addKey('S')],
     };
 
     // État "virtuel" pour le tactile (rempli plus tard par des boutons à l'écran).
-    this.virtual = { left: false, right: false, jump: false, attack: false, interact: false };
+    this.virtual = { left: false, right: false, jump: false, attack: false, ranged: false, interact: false };
     this._virtualJumpJustPressed = false;
   }
 
@@ -57,6 +58,10 @@ export default class InputManager {
 
   isAttackJustPressed() {
     return this._anyJustDown(this.keys.attack) || false;
+  }
+
+  isRangedJustPressed() {
+    return this._anyJustDown(this.keys.ranged) || false;
   }
 
   isInteractJustPressed() {

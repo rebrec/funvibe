@@ -45,6 +45,7 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
     this.attackTimer = 0; // > 0 => la frappe est active
     this.attackCooldown = 0;
     this.attackId = 0; // incrémenté à chaque frappe (1 touche max par ennemi/frappe)
+    this.rangedCooldown = 0; // ms avant de pouvoir relancer un projectile
     this.facing = 1; // 1 = droite, -1 = gauche
 
     // État sol, renseigné par les événements de collision Matter.
@@ -120,6 +121,7 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
     this.invincibleTimer = Math.max(0, this.invincibleTimer - delta);
     this.attackTimer = Math.max(0, this.attackTimer - delta);
     this.attackCooldown = Math.max(0, this.attackCooldown - delta);
+    this.rangedCooldown = Math.max(0, this.rangedCooldown - delta);
     if (this.invincibleTimer === 0) this.setAlpha(1);
     if (input.isAttackJustPressed() && this.attackCooldown === 0) this.startAttack();
 

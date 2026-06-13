@@ -52,6 +52,14 @@ export const PLAYER = {
   ATTACK_DURATION: 160, // ms où la frappe est active
   ATTACK_COOLDOWN: 300, // ms entre deux frappes
   ATTACK_RANGE: 44, // portée de la frappe devant le héros
+  RANGED_COOLDOWN: 320, // ms entre deux lancers de projectile
+};
+
+export const PROJECTILE = {
+  SPEED: 12, // vitesse horizontale (unités Matter)
+  LIFETIME: 900, // ms avant disparition
+  RADIUS: 9,
+  COLOR: 0x33373d,
 };
 
 export const ENEMY = {

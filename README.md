@@ -57,7 +57,10 @@ Une scène jouable pour valider le « feel » du déplacement :
 ### Jalon M2 (combat de base)
 
 - **Ennemis** (carrés rouges) qui patrouillent sur leurs plateformes.
-- **Frappe** du héros (`J` / `X`) : zone d'attaque devant lui, tue les ennemis touchés.
+- **Frappe** au corps-à-corps (`J` / `X`) : zone d'attaque devant le héros.
+- **Lancer** à distance (`K` / `L`) : un shuriken file devant le héros, touche les
+  ennemis et disparaît au contact d'un mur (prototype de variété d'attaques).
+- Ennemis avec **PV** (1 ou 2 coups), sauts occasionnels, ils se traversent entre eux.
 - **Vie** affichée en cœurs (haut-gauche). Contact d'un ennemi = -1 cœur, avec
   **invincibilité brève + recul + clignotement**. À 0 cœur : réapparition au départ.
 - La vie n'est PAS persistée (repart au max à chaque session / réapparition) ;
@@ -78,7 +81,8 @@ src/
     SaveManager.js      persistance localStorage (pièces, cristaux...)
   entities/
     Player.js           déplacement, saut, double-saut, vie, attaque
-    Enemy.js            ennemi qui patrouille
+    Enemy.js            ennemi qui patrouille (PV, sauts)
+    Projectile.js       shuriken (attaque à distance)
   scenes/
     BootScene.js        génère les textures + charge la sauvegarde
     LevelScene.js       le niveau jouable + collectibles + ennemis
