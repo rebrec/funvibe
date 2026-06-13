@@ -276,16 +276,16 @@ export default class LevelScene extends Phaser.Scene {
 
   // --- Ennemis ---
   buildEnemies() {
-    this.addEnemy(460, 1800, 320, 600); // sol de départ
-    this.addEnemy(3470, 1450, 3400, 3540); // palier après la pente raide
-    this.addEnemy(6480, 1400, 6340, 6620); // section descente
-    this.addEnemy(7300, 1600, 7100, 7600); // ligne de vitesse
-    this.addEnemy(7700, 1600, 7620, 7900);
-    this.addEnemy(9080, 1650, 8940, 9260); // avant la dernière tour
+    this.addEnemy(460, 1800, 320, 600, 1); // sol de départ
+    this.addEnemy(3470, 1450, 3400, 3540, 2); // palier après la pente raide (coriace)
+    this.addEnemy(6480, 1400, 6340, 6620, 1); // section descente
+    this.addEnemy(7300, 1600, 7100, 7600, 1); // ligne de vitesse
+    this.addEnemy(7700, 1600, 7620, 7900, 2);
+    this.addEnemy(9080, 1650, 8940, 9260, 2); // avant la dernière tour (coriace)
   }
 
-  addEnemy(x, platformTop, minX, maxX) {
-    const e = new Enemy(this, x, platformTop - ENEMY.HEIGHT / 2, { minX, maxX });
+  addEnemy(x, platformTop, minX, maxX, hp) {
+    const e = new Enemy(this, x, platformTop - ENEMY.HEIGHT / 2, { minX, maxX, hp });
     this.enemies.push(e);
     return e;
   }
@@ -338,13 +338,18 @@ export default class LevelScene extends Phaser.Scene {
     this.cameras.main.setFollowOffset(this.camLookaheadX, this.camLookaheadY);
 
     // --- Ennemis & combat ---
-    for (const e of this.enemies) e.update();
+    for (const e of this.enemies) e.update(delta);
 
     if (this.player.isAttacking) {
       const hb = this.player.getAttackHitbox();
       for (const e of this.enemies) {
-        if (e.alive && LevelScene.overlap(hb.x, hb.y, hb.w, hb.h, e.x, e.y, ENEMY.WIDTH, ENEMY.HEIGHT)) {
-          e.kill();
+        if (
+          e.alive &&
+          e.lastHitAttackId !== this.player.attackId &&
+          LevelScene.overlap(hb.x, hb.y, hb.w, hb.h, e.x, e.y, ENEMY.WIDTH, ENEMY.HEIGHT)
+        ) {
+          e.lastHitAttackId = this.player.attackId;
+          e.takeHit(1);
         }
       }
     }

@@ -24,11 +24,11 @@ export default class BootScene extends Phaser.Scene {
     e.fillStyle(ENEMY.COLOR, 1);
     e.fillRoundedRect(0, 0, ENEMY.WIDTH, ENEMY.HEIGHT, 8);
     e.fillStyle(0xffffff, 1);
-    e.fillCircle(13, 15, 5);
-    e.fillCircle(27, 15, 5);
+    e.fillCircle(11, 15, 4);
+    e.fillCircle(23, 15, 4);
     e.fillStyle(0x000000, 1);
-    e.fillCircle(14, 16, 2);
-    e.fillCircle(28, 16, 2);
+    e.fillCircle(12, 16, 2);
+    e.fillCircle(24, 16, 2);
     e.generateTexture('enemy', ENEMY.WIDTH, ENEMY.HEIGHT);
     e.destroy();
 

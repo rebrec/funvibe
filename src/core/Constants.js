@@ -55,8 +55,12 @@ export const PLAYER = {
 };
 
 export const ENEMY = {
-  WIDTH: 40,
-  HEIGHT: 40,
+  WIDTH: 34,
+  HEIGHT: 46, // un peu plus fin et haut (silhouette moins "blob")
   COLOR: 0xff5555,
   SPEED: 1.8, // vitesse de patrouille (unités Matter)
+  HP: 1, // points de vie par défaut
+  JUMP_VELOCITY: 9,
+  JUMP_INTERVAL_MIN: 1100, // ms entre deux sauts (aléatoire)
+  JUMP_INTERVAL_MAX: 2800,
 };
