@@ -33,22 +33,27 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
     this.setFixedRotation();
     this.setPosition(x, y);
 
+    // Lit les stats effectives depuis le registry (base + upgrades boutique).
+    const reg = scene.registry;
+    this.maxJumps      = reg.get('maxJumps')  ?? PLAYER.MAX_JUMPS;
+    this.regenMultiplier = (reg.get('regenSpeed') ?? 0) ? 0.6 : 1.0;
+
     // État "feel"
     this.coyoteTimer = 0;
     this.jumpBufferTimer = 0;
-    this.jumpsRemaining = PLAYER.MAX_JUMPS;
+    this.jumpsRemaining = this.maxJumps;
     this.isJumping = false;
 
     // État combat
-    this.health = PLAYER.MAX_HEALTH;
+    this.health = reg.get('maxHealth') ?? PLAYER.MAX_HEALTH;
     this.invincibleTimer = 0;
     this.attackTimer = 0; // > 0 => la frappe est active
     this.attackCooldown = 0;
     this.attackId = 0; // incrémenté à chaque frappe (1 touche max par ennemi/frappe)
     this.rangedCooldown = 0; // ms avant de pouvoir relancer un projectile
-    this.maxAmmo = PLAYER.RANGED_MAX_AMMO;
+    this.maxAmmo = reg.get('maxAmmo') ?? PLAYER.RANGED_MAX_AMMO;
     this.ammo = this.maxAmmo;
-    this.regenTimer = PLAYER.RANGED_REGEN; // ms avant +1 shuriken
+    this.regenTimer = PLAYER.RANGED_REGEN * this.regenMultiplier;
     this.facing = 1; // 1 = droite, -1 = gauche
 
     // État sol, renseigné par les événements de collision Matter.
@@ -113,7 +118,7 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
     // --- Timers d'aide ---
     if (grounded) {
       this.coyoteTimer = PLAYER.COYOTE_TIME;
-      this.jumpsRemaining = PLAYER.MAX_JUMPS;
+      this.jumpsRemaining = this.maxJumps;
     } else {
       this.coyoteTimer = Math.max(0, this.coyoteTimer - delta);
     }
@@ -133,7 +138,7 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
       this.regenTimer -= delta;
       if (this.regenTimer <= 0) {
         this.ammo += 1;
-        this.regenTimer = PLAYER.RANGED_REGEN;
+        this.regenTimer = PLAYER.RANGED_REGEN * this.regenMultiplier;
         this.scene.registry.set('ammo', this.ammo);
       }
     }
@@ -176,7 +181,7 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
       if (grounded || this.coyoteTimer > 0) {
         this.setIgnoreGravity(false); // au cas où on sautait depuis l'arrêt
         this.setVelocityY(-PLAYER.JUMP_VELOCITY);
-        this.jumpsRemaining = PLAYER.MAX_JUMPS - 1;
+        this.jumpsRemaining = this.maxJumps - 1;
         this.jumpBufferTimer = 0;
         this.coyoteTimer = 0;
         this.isJumping = true;
@@ -222,7 +227,7 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
     this.rangedCooldown = PLAYER.RANGED_COOLDOWN;
     this.ammo -= 1;
     // Si on était au max, relancer le compteur de régénération.
-    if (this.ammo === this.maxAmmo - 1) this.regenTimer = PLAYER.RANGED_REGEN;
+    if (this.ammo === this.maxAmmo - 1) this.regenTimer = PLAYER.RANGED_REGEN * this.regenMultiplier;
     this.scene.registry.set('ammo', this.ammo);
   }
 
@@ -258,7 +263,7 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
   }
 
   respawn(x, y) {
-    this.health = PLAYER.MAX_HEALTH;
+    this.health = this.scene.registry.get('maxHealth') ?? PLAYER.MAX_HEALTH;
     this.invincibleTimer = 700;
     this.setIgnoreGravity(false);
     this.setVelocity(0, 0);

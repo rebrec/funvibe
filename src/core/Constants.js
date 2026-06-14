@@ -68,6 +68,15 @@ export const PROJECTILE = {
   COLOR: 0x33373d,
 };
 
+export const SHOP = {
+  ITEMS: [
+    { id: 'maxHealth',  label: '+1 coeur max',    desc: 'PV max +1',              costs: [5, 10],  maxLevel: 2 },
+    { id: 'maxJumps',   label: '+1 saut aerien',  desc: 'Sauts possibles +1',     costs: [8, 14],  maxLevel: 2 },
+    { id: 'maxAmmo',    label: '+2 shurikens',    desc: 'Stock max +2',           costs: [6, 12],  maxLevel: 2 },
+    { id: 'regenSpeed', label: 'Recharge rapide', desc: 'Recharge x1.7 plus vite', costs: [10],   maxLevel: 1 },
+  ],
+};
+
 export const ENEMY = {
   WIDTH: 34,
   HEIGHT: 46, // un peu plus fin et haut (silhouette moins "blob")

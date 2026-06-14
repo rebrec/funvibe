@@ -2,7 +2,7 @@
 // mondes/maîtrises débloqués...). Tolérant aux erreurs (mode privé, quota, etc.).
 
 const KEY = 'jeuleo.save.v1';
-const DEFAULT = { coins: 0, crystals: 0 };
+const DEFAULT = { coins: 0, crystals: 0, upgrades: {} };
 
 export default class SaveManager {
   static load() {

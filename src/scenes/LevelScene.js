@@ -60,13 +60,14 @@ export default class LevelScene extends Phaser.Scene {
     this.camLookaheadX = 0;
     this.camLookaheadY = 0;
 
-    // Vie + munitions initiales (non persistées : repartent au max à chaque session).
-    this.registry.set('maxHealth', PLAYER.MAX_HEALTH);
+    // Synchronise vie + munitions initiales dans le registry (le joueur lit déjà
+    // maxHealth / maxAmmo depuis le registry via les upgrades — on ne les réécrit pas).
     this.registry.set('health', this.player.health);
     this.registry.set('maxAmmo', this.player.maxAmmo);
     this.registry.set('ammo', this.player.ammo);
 
     this.createHelpOverlay();
+    this.buildHubPortal();
 
     // HUD (scène parallèle) + ramassage des collectibles + impacts de projectiles.
     this.scene.launch('UIScene');
@@ -352,6 +353,27 @@ export default class LevelScene extends Phaser.Scene {
     }
   }
 
+  buildHubPortal() {
+    const x = 60, y = 1760;
+    this.add.circle(x, y, 28, 0x6633cc, 0.85);
+    this.add.circle(x, y, 20, 0x9966ff, 0.7);
+    this.add.text(x, y - 38, 'HUB', {
+      fontFamily: 'monospace', fontSize: '13px', color: '#cc99ff', fontStyle: 'bold',
+    }).setOrigin(0.5, 1);
+    this.hubPortal = { x, y };
+    this.hubHint = this.add
+      .text(GAME.WIDTH / 2, GAME.HEIGHT - 100, 'E : retourner au village', {
+        fontFamily: 'monospace', fontSize: '15px', color: '#ffffff',
+        backgroundColor: '#00000088', padding: { x: 10, y: 5 },
+      })
+      .setScrollFactor(0).setDepth(100).setOrigin(0.5).setVisible(false);
+  }
+
+  goToHub() {
+    this.scene.stop('UIScene');
+    this.scene.start('HubScene');
+  }
+
   createHelpOverlay() {
     const lines = [
       'Flèches / A-D : se déplacer   ·   Espace / ↑ / W : sauter (double-saut)',
@@ -430,6 +452,13 @@ export default class LevelScene extends Phaser.Scene {
       p.life -= delta;
       if (p.life <= 0) this.destroyProjectile(body);
     }
+
+    // Portail retour au hub
+    const nearHub = Phaser.Math.Distance.Between(
+      this.player.x, this.player.y, this.hubPortal.x, this.hubPortal.y
+    ) < 80;
+    this.hubHint.setVisible(nearHub);
+    if (nearHub && this.input_.isInteractJustPressed()) this.goToHub();
 
     // Chute dans le vide : on réapparaît au départ (sans perdre de vie).
     if (this.player.y > DEATH_Y) {

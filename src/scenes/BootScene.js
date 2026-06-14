@@ -50,11 +50,19 @@ export default class BootScene extends Phaser.Scene {
     s.generateTexture('shuriken', size, size);
     s.destroy();
 
-    // Charge la sauvegarde dans le registre global (lu par le HUD et le jeu).
+    // Charge la sauvegarde et initialise le registre global.
     const save = SaveManager.load();
     this.registry.set('coins', save.coins);
     this.registry.set('crystals', save.crystals);
 
-    this.scene.start('LevelScene');
+    // Stats effectives = base + upgrades achetées en boutique.
+    const upg = save.upgrades ?? {};
+    this.registry.set('upgrades', upg);
+    this.registry.set('maxHealth', PLAYER.MAX_HEALTH + (upg.maxHealth ?? 0));
+    this.registry.set('maxJumps',  PLAYER.MAX_JUMPS  + (upg.maxJumps  ?? 0));
+    this.registry.set('maxAmmo',   PLAYER.RANGED_MAX_AMMO + (upg.maxAmmo ?? 0) * 2);
+    this.registry.set('regenSpeed', upg.regenSpeed ?? 0);
+
+    this.scene.start('HubScene');
   }
 }
