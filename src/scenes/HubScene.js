@@ -42,7 +42,26 @@ export default class HubScene extends Phaser.Scene {
       })
       .setScrollFactor(0).setDepth(100).setOrigin(0.5).setVisible(false);
 
+    this._buildEditorButton();
+
     this.scene.launch('UIScene');
+  }
+
+  _hasCustomLevels() {
+    try { return JSON.parse(localStorage.getItem('customLevels') ?? '[]').length > 0; }
+    catch { return false; }
+  }
+
+  // Bouton fixé à l'écran (coin haut-droit) : ouvre l'éditeur dans un nouvel onglet.
+  _buildEditorButton() {
+    const btn = this.add.text(GAME.WIDTH - 12, 12, '✎ ÉDITEUR', {
+      fontFamily: 'monospace', fontSize: '14px', color: '#ffffff',
+      backgroundColor: '#5533aa', padding: { x: 10, y: 6 },
+    }).setScrollFactor(0).setDepth(200).setOrigin(1, 0).setInteractive({ useHandCursor: true });
+    btn.on('pointerover', () => btn.setStyle({ backgroundColor: '#7744cc' }));
+    btn.on('pointerout',  () => btn.setStyle({ backgroundColor: '#5533aa' }));
+    // En prod, l'éditeur est servi à editor/ (même origine) — nouvel onglet.
+    btn.on('pointerdown', () => window.open('editor/', '_blank'));
   }
 
   addPlatform(x, topY, width, color) {
@@ -93,6 +112,21 @@ export default class HubScene extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '16px', color: '#cc99ff', fontStyle: 'bold',
     }).setOrigin(0.5, 1);
     this.doors.push({ x: px, y: py, action: 'level', hint: 'E : entrer dans le niveau' });
+
+    // === Portail NIVEAUX CUSTOM (visible seulement si des niveaux existent) ===
+    if (this._hasCustomLevels()) {
+      const cxp = 1230, cyp = GROUND_Y - 56;
+      const chalo = this.add.circle(cxp, cyp, 42, 0xaa6611, 0.8);
+      const ccore = this.add.circle(cxp, cyp, 32, 0xffaa33, 0.6);
+      this.tweens.add({
+        targets: [chalo, ccore], scale: { from: 0.93, to: 1.07 },
+        duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      });
+      this.add.text(cxp, cyp - 56, 'CUSTOM', {
+        fontFamily: 'monospace', fontSize: '16px', color: '#ffcc66', fontStyle: 'bold',
+      }).setOrigin(0.5, 1);
+      this.doors.push({ x: cxp, y: cyp, action: 'custom', hint: 'E : choisir un niveau custom' });
+    }
 
     // Arbres (style selon thème)
     [310, 770, 1160].forEach(tx => this._drawTree(tx, GROUND_Y));
@@ -190,6 +224,9 @@ export default class HubScene extends Phaser.Scene {
       this.scene.stop('UIScene');
       this.scene.pause();
       this.scene.launch('LevelScene');
+    } else if (action === 'custom') {
+      this.scene.pause();
+      this.scene.launch('CustomLevelsScene');
     }
   }
 }

@@ -94,9 +94,9 @@ export default class SkinDebugScene extends Phaser.Scene {
     }).setOrigin(0.5, 0.5);
 
     // Aperçu joueur (rendu en temps réel du skin sélectionné)
-    this._previewPlayer = this.add.image(panX + panW - 50, panY + 130, 'player').setScale(2);
-    this._previewWalker  = this.add.image(panX + panW - 50, panY + 182, 'enemy-walker').setScale(2);
-    this._previewCharger = this.add.image(panX + panW - 50, panY + 234, 'enemy-charger').setScale(2);
+    this._previewPlayer = this.add.image(panX + panW - 50, panY + 130, 'player', 0).setScale(2);
+    this._previewWalker  = this.add.image(panX + panW - 50, panY + 182, 'enemy-walker', 0).setScale(2);
+    this._previewCharger = this.add.image(panX + panW - 50, panY + 234, 'enemy-charger', 0).setScale(2);
     this.add.text(panX + panW - 50, panY + 100, 'Aperçu', {
       fontFamily: 'monospace', fontSize: '11px', color: '#778899',
     }).setOrigin(0.5, 0.5);
@@ -141,9 +141,9 @@ export default class SkinDebugScene extends Phaser.Scene {
     }
 
     // Rafraîchit les aperçus (les textures ont été régénérées dans _cycle)
-    if (this._previewPlayer)  this._previewPlayer.setTexture('player');
-    if (this._previewWalker)  this._previewWalker.setTexture('enemy-walker');
-    if (this._previewCharger) this._previewCharger.setTexture('enemy-charger');
+    if (this._previewPlayer)  this._previewPlayer.setTexture('player', 0);
+    if (this._previewWalker)  this._previewWalker.setTexture('enemy-walker', 0);
+    if (this._previewCharger) this._previewCharger.setTexture('enemy-charger', 0);
   }
 
   _apply() {

@@ -37,6 +37,7 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
     this.setExistingBody(body);
     this.setFixedRotation();
     this.setPosition(x, y);
+    this.setFrame(0); // évite d'afficher la spritesheet entière (__BASE) avant la 1re anim
 
     // Lit les stats effectives depuis le registry (base + upgrades boutique).
     const reg = scene.registry;
@@ -48,6 +49,7 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
     this.jumpBufferTimer = 0;
     this.jumpsRemaining = this.maxJumps;
     this.isJumping = false;
+    this.isSpinning = false; // anim de rotation en boule en cours (saut aérien)
 
     // État combat
     this.health = reg.get('maxHealth') ?? PLAYER.MAX_HEALTH;
@@ -204,16 +206,10 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
         this.jumpsRemaining -= 1;
         this.jumpBufferTimer = 0;
         this.isJumping = true;
-        // Pirouette (boule) sur chaque saut aérien
-        this.scene.tweens.killTweensOf(this);
-        this.scene.tweens.add({
-          targets: this,
-          angle: { from: 0, to: 360 },
-          scaleX: 0.65, scaleY: 0.65,
-          duration: 260, ease: 'Cubic.easeIn',
-          yoyo: true,
-          onComplete: () => { this.setAngle(0); this.setScale(1); },
-        });
+        // Vraie animation de rotation en boule (frames dédiées), one-shot.
+        this.isSpinning = true;
+        this.play('player-spin', true);
+        this.once('animationcomplete-player-spin', () => { this.isSpinning = false; });
       }
     }
 
@@ -223,6 +219,20 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
       this.isJumping = false;
     }
     if (body.velocity.y >= 0) this.isJumping = false;
+
+    this._updateAnim(axis);
+  }
+
+  // Choisit l'animation selon l'état (sauf pendant la rotation one-shot).
+  _updateAnim(axis) {
+    if (this.isSpinning) return;
+    if (!this.isGrounded) {
+      this.play(this.body.velocity.y < 0 ? 'player-jump' : 'player-fall', true);
+    } else if (Math.abs(axis) > 0.01) {
+      this.play('player-run', true);
+    } else {
+      this.play('player-idle', true);
+    }
   }
 
   get isAttacking() {

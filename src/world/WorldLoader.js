@@ -10,6 +10,7 @@ export default class WorldLoader {
       else if (t.type === 'platform') { scene.addPlatform(t.x, t.y, t.width, theme.platColor, true); }
       else if (t.type === 'wall')     { scene.addPlatform(t.x, t.y, t.width, theme.platColor, false); }
       else if (t.type === 'slope')    { scene.addSlope(t.x1, t.y1, t.x2, t.y2); }
+      else if (t.type === 'curve')    { scene.addCurve(t.points); }
       else if (t.type === 'landmark') {
         scene.addPlatform(t.x, t.y, t.width, 0xc06be0, true);
         if (t.label) {

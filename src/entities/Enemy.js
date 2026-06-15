@@ -26,6 +26,7 @@ export default class Enemy extends Phaser.Physics.Matter.Sprite {
     this.setExistingBody(body);
     this.setFixedRotation();
     this.setPosition(x, y);
+    this.setFrame(0);
 
     this.minX = minX ?? x - 100;
     this.maxX = maxX ?? x + 100;
@@ -47,6 +48,9 @@ export default class Enemy extends Phaser.Physics.Matter.Sprite {
 
   update(delta) {
     if (!this.alive) return;
+
+    // Animation de marche (rebond) — clé selon le comportement.
+    this.play(this.behavior === 'charger' ? 'charger-walk' : 'walker-walk', true);
 
     // Inversion aux bornes de patrouille (commun aux deux comportements).
     if (this.x <= this.minX) this.dir = 1;

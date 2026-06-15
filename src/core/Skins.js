@@ -70,149 +70,198 @@ export function getTheme(name) {
 }
 
 // ──────────────────────────────────────────────────────────────
-// JOUEUR — 36 × 48 px, clé : 'player'
+// JOUEUR — spritesheet articulée, clé : 'player'
+// Frame 44×56. Disposition : 0 idle · 1-6 course · 7 saut · 8 chute
+// · 9 atterrissage · 10-14 rotation en boule · 15 touché.
 // ──────────────────────────────────────────────────────────────
 
-export function generatePlayerTexture(scene, skinName) {
-  const W = 36, H = 48;
-  if (scene.textures.exists('player')) scene.textures.remove('player');
+export const PLAYER_FRAME = { W: 44, H: 56, COUNT: 16 };
+
+const PLAYER_PALETTES = {
+  ninja:   { cloth: 0x232b48, clothDark: 0x161c30, accent: 0xcc2222, skin: 0xe6b88a, boot: 0x0e1020, eye: 0x9ec3ff },
+  warrior: { cloth: 0x5a7090, clothDark: 0x3a4a5a, accent: 0xaa2222, skin: 0xd6e2ee, boot: 0x2a3a4a, eye: 0xeaf2ff },
+  monk:    { cloth: 0xe07820, clothDark: 0xb35e10, accent: 0xcc5500, skin: 0xd9b07a, boot: 0x7a3e08, eye: 0x3a2400 },
+};
+
+const DEG = Math.PI / 180;
+
+// Dessine un membre à 2 segments depuis (x0,y0). Angles en degrés, 0 = vers le bas.
+function _limb(g, x0, y0, a1, l1, a2, l2, thick, color) {
+  const j1x = x0 + Math.sin(a1 * DEG) * l1;
+  const j1y = y0 + Math.cos(a1 * DEG) * l1;
+  const a2abs = a1 + a2;
+  const fx = j1x + Math.sin(a2abs * DEG) * l2;
+  const fy = j1y + Math.cos(a2abs * DEG) * l2;
+  g.lineStyle(thick, color, 1);
+  g.lineBetween(x0, y0, j1x, j1y);
+  g.lineBetween(j1x, j1y, fx, fy);
+  g.fillStyle(color, 1);
+  g.fillCircle(j1x, j1y, thick / 2);
+  g.fillCircle(fx, fy, thick / 2);
+  return { x: fx, y: fy };
+}
+
+// Dessine l'humanoïde dans la frame i, à l'offset x0 (coin gauche de la frame).
+function _drawHumanoid(g, x0, pal, pose) {
+  const W = PLAYER_FRAME.W, H = PLAYER_FRAME.H;
+  const cx = x0 + W / 2;
+  const bob = pose.bob ?? 0;
+  const groundY = H - 4 + bob;     // niveau des pieds
+  const hipY = groundY - 20;       // hanches
+  const shoulderY = hipY - 16;     // épaules
+  const headY = shoulderY - 9;     // centre tête
+
+  // ── Mode boule (rotation) ──
+  if (pose.ball) {
+    const r = 15;
+    const ccy = (shoulderY + hipY) / 2 + 2;
+    // Corps en boule
+    g.fillStyle(pal.cloth, 1);
+    g.fillCircle(cx, ccy, r);
+    g.fillStyle(pal.clothDark, 1);
+    g.fillCircle(cx, ccy, r - 5);
+    // Bande accent + nubs de membres tournant
+    const ang = (pose.ballAngle ?? 0) * DEG;
+    g.fillStyle(pal.accent, 1);
+    for (let k = 0; k < 2; k++) {
+      const a = ang + k * Math.PI;
+      g.fillCircle(cx + Math.cos(a) * (r - 3), ccy + Math.sin(a) * (r - 3), 4);
+    }
+    g.fillStyle(pal.boot, 1);
+    for (let k = 0; k < 2; k++) {
+      const a = ang + Math.PI / 2 + k * Math.PI;
+      g.fillCircle(cx + Math.cos(a) * (r - 2), ccy + Math.sin(a) * (r - 2), 4);
+    }
+    // Petite tête qui dépasse
+    g.fillStyle(pal.skin, 1);
+    g.fillCircle(cx + Math.cos(ang) * (r - 1), ccy + Math.sin(ang) * (r - 1), 5);
+    return;
+  }
+
+  const lean = pose.lean ?? 0;
+  const sx = cx + Math.sin(lean * DEG) * 14; // décalage épaules selon inclinaison
+
+  // ── Jambes (derrière le torse) ──
+  _limb(g, cx - 4, hipY, pose.legL[0], 11, pose.legL[1], 11, 7, pal.boot);
+  _limb(g, cx + 4, hipY, pose.legR[0], 11, pose.legR[1], 11, 7, pal.cloth);
+
+  // ── Bras arrière ──
+  _limb(g, sx - 6, shoulderY + 1, pose.armL[0], 9, pose.armL[1], 9, 6, pal.clothDark);
+
+  // ── Torse ──
+  g.fillStyle(pal.cloth, 1);
+  g.fillRoundedRect(sx - 9, shoulderY - 2, 18, hipY - shoulderY + 6, 6);
+  // Ceinture accent
+  g.fillStyle(pal.accent, 1);
+  g.fillRect(sx - 9, hipY - 2, 18, 4);
+
+  // ── Tête ──
+  g.fillStyle(pal.skin, 1);
+  g.fillCircle(sx, headY, 8);
+  // Bandeau / casque accent
+  g.fillStyle(pal.accent, 1);
+  g.fillRect(sx - 8, headY - 4, 16, 3);
+  // Yeux (regard vers la droite = sens par défaut)
+  g.fillStyle(pal.eye, 1);
+  g.fillRect(sx + 1, headY - 1, 4, 3);
+
+  // ── Bras avant ──
+  _limb(g, sx + 6, shoulderY + 1, pose.armR[0], 9, pose.armR[1], 9, 6, pal.cloth);
+}
+
+export function generatePlayerTexture(scene, skinName, key = 'player') {
+  const pal = PLAYER_PALETTES[skinName] ?? PLAYER_PALETTES.ninja;
+  const { W, H, COUNT } = PLAYER_FRAME;
+  if (scene.textures.exists(key)) scene.textures.remove(key);
   const g = scene.make.graphics({ x: 0, y: 0, add: false });
-  if (skinName === 'warrior') _drawWarrior(g, W, H);
-  else if (skinName === 'monk') _drawMonk(g, W, H);
-  else _drawNinja(g, W, H);
-  g.generateTexture('player', W, H);
+
+  for (let i = 0; i < COUNT; i++) {
+    _drawHumanoid(g, i * W, pal, _playerPose(i));
+  }
+  g.generateTexture(key, W * COUNT, H);
   g.destroy();
+
+  // Découpe en frames numériques 0..COUNT-1
+  const tex = scene.textures.get(key);
+  for (let i = 0; i < COUNT; i++) {
+    if (!tex.has(String(i))) tex.add(i, 0, i * W, 0, W, H);
+  }
 }
 
-function _drawNinja(g, W, H) {
-  // Corps bleu-noir foncé
-  g.fillStyle(0x1a1a2e, 1);
-  g.fillRoundedRect(0, 0, W, H, 7);
-  // Zone tête légèrement plus claire
-  g.fillStyle(0x252540, 1);
-  g.fillRect(4, 0, 28, 13);
-  // Bandeau rouge
-  g.fillStyle(0xcc2222, 1);
-  g.fillRect(3, 8, 30, 5);
-  // Masque bas du visage
-  g.fillStyle(0x0e0e22, 1);
-  g.fillRect(5, 19, 26, 9);
-  // Yeux blancs (fentes)
-  g.fillStyle(0xffffff, 1);
-  g.fillRect(7, 14, 9, 4);
-  g.fillRect(20, 14, 9, 4);
-  // Iris (légèrement bleutées)
-  g.fillStyle(0x88aaff, 1);
-  g.fillRect(9, 15, 5, 2);
-  g.fillRect(22, 15, 5, 2);
-  // Écharpe violette (côté gauche, signe d'orientation)
-  g.fillStyle(0x4a1a6a, 1);
-  g.fillRect(0, 20, 5, 14);
-  g.fillRect(0, 34, 3, 8);
-  // Ceinture
-  g.fillStyle(0x3a2a10, 1);
-  g.fillRect(4, 31, 28, 4);
-  g.fillStyle(0x8a6a30, 1);
-  g.fillRect(14, 31, 8, 4);
-  // Jambes (séparées)
-  g.fillStyle(0x141428, 1);
-  g.fillRect(3, 37, 13, 11);
-  g.fillRect(20, 37, 13, 11);
-  g.fillStyle(0x080810, 1);
-  g.fillRect(16, 37, 4, 11);
-}
-
-function _drawWarrior(g, W, H) {
-  // Corps acier
-  g.fillStyle(0x5a7090, 1);
-  g.fillRoundedRect(0, 0, W, H, 6);
-  // Cape violette derrière (côté gauche)
-  g.fillStyle(0x1a0030, 1);
-  g.fillRect(0, 14, 5, 26);
-  // Casque gris foncé
-  g.fillStyle(0x3a4a5a, 1);
-  g.fillRoundedRect(0, 0, W, 20, { tl: 6, tr: 6, bl: 0, br: 0 });
-  // Crête de casque (rouge)
-  g.fillStyle(0xaa2222, 1);
-  g.fillRect(13, 0, 10, 5);
-  // Visière (fentes)
-  g.fillStyle(0x1a2a3a, 1);
-  g.fillRect(5, 8, 9, 5);
-  g.fillRect(22, 8, 9, 5);
-  // Lueur des yeux
-  g.fillStyle(0xccddee, 1);
-  g.fillRect(6, 9, 7, 3);
-  g.fillRect(23, 9, 7, 3);
-  // Épaulières
-  g.fillStyle(0x2a3a4a, 1);
-  g.fillRect(0, 19, 8, 10);
-  g.fillRect(28, 19, 8, 10);
-  // Plastron
-  g.fillStyle(0x4a6080, 1);
-  g.fillRect(5, 20, 26, 16);
-  // Croix sur le plastron
-  g.fillStyle(0x6a8aa0, 1);
-  g.fillRect(16, 21, 4, 14);
-  g.fillRect(6, 28, 22, 2);
-  // Ceinture
-  g.fillStyle(0x2a3a4a, 1);
-  g.fillRect(3, 36, 30, 4);
-  // Jambières
-  g.fillStyle(0x4a6080, 1);
-  g.fillRect(3, 40, 13, 8);
-  g.fillRect(20, 40, 13, 8);
-  g.fillStyle(0x3a5070, 1);
-  g.fillRect(16, 40, 4, 8);
-}
-
-function _drawMonk(g, W, H) {
-  // Robe safran
-  g.fillStyle(0xe07820, 1);
-  g.fillRoundedRect(0, 0, W, H, 6);
-  // Crâne rasé (peau)
-  g.fillStyle(0xd4aa70, 1);
-  g.fillRoundedRect(7, 0, 22, 16, { tl: 8, tr: 8, bl: 4, br: 4 });
-  // Yeux fermés (zen)
-  g.fillStyle(0x6a4400, 1);
-  g.fillRect(9, 11, 7, 2);
-  g.fillRect(20, 11, 7, 2);
-  // Sourire
-  g.fillRect(13, 15, 10, 2);
-  g.fillRect(12, 16, 2, 2);
-  g.fillRect(22, 16, 2, 2);
-  // Grand obi / ceinture
-  g.fillStyle(0xcc5500, 1);
-  g.fillRect(0, 28, W, 8);
-  g.fillStyle(0xff6a00, 1);
-  g.fillRect(13, 28, 10, 8);
-  // Plis de robe
-  g.fillStyle(0xc06810, 1);
-  g.fillRect(14, 36, 2, 12);
-  g.fillRect(7, 36, 2, 12);
-  g.fillRect(27, 36, 2, 12);
-  // Chapelet
-  g.fillStyle(0x8a4400, 1);
-  for (let i = 0; i < 5; i++) g.fillCircle(10 + i * 4, 26, 2);
+// Renvoie la pose (angles articulaires) de la frame i.
+function _playerPose(i) {
+  // 0 : idle
+  if (i === 0) {
+    return { legL: [6, 4], legR: [-6, 4], armL: [10, 8], armR: [-10, 8], lean: 2, bob: 1 };
+  }
+  // 1-6 : course (cycle de marche)
+  if (i >= 1 && i <= 6) {
+    const p = (i - 1) / 6 * Math.PI * 2;
+    const sw = 34 * Math.sin(p);          // balancement jambe
+    const swA = 28 * Math.sin(p + Math.PI); // bras opposés
+    return {
+      legL: [sw, Math.max(0, 22 * Math.sin(p + 1)) ],
+      legR: [-sw, Math.max(0, 22 * Math.sin(p + 1 + Math.PI))],
+      armL: [swA, 18], armR: [-swA, 18],
+      lean: 8, bob: Math.abs(Math.cos(p)) * -2,
+    };
+  }
+  // 7 : saut (montée) — jambes repliées, bras hauts
+  if (i === 7) {
+    return { legL: [22, 40], legR: [-18, 40], armL: [150, 20], armR: [-150, 20], lean: 6, bob: -2 };
+  }
+  // 8 : chute — jambes écartées, bras tendus
+  if (i === 8) {
+    return { legL: [26, 8], legR: [-26, 8], armL: [120, 12], armR: [-120, 12], lean: -4, bob: 0 };
+  }
+  // 9 : atterrissage (squash)
+  if (i === 9) {
+    return { legL: [34, 50], legR: [-34, 50], armL: [50, 14], armR: [-50, 14], lean: 14, bob: 6 };
+  }
+  // 10-14 : rotation en boule
+  if (i >= 10 && i <= 14) {
+    return { ball: true, ballAngle: (i - 10) * 72 };
+  }
+  // 15 : touché — bascule en arrière
+  return { legL: [-20, 10], legR: [12, 10], armL: [-140, 16], armR: [140, 16], lean: -18, bob: 2 };
 }
 
 // ──────────────────────────────────────────────────────────────
 // ENNEMIS — 34 × 46 px, clés : 'enemy-walker' / 'enemy-charger'
 // ──────────────────────────────────────────────────────────────
 
+export const ENEMY_FRAME = { W: 34, H: 46, COUNT: 2 };
+
 export function generateEnemyTexture(scene, skinName, type) {
-  const W = 34, H = 46;
+  const { W, H, COUNT } = ENEMY_FRAME;
   const key = type === 'charger' ? 'enemy-charger' : 'enemy-walker';
   if (scene.textures.exists(key)) scene.textures.remove(key);
   const g = scene.make.graphics({ x: 0, y: 0, add: false });
-  if (type === 'charger') {
-    if (skinName === 'boar') _drawBoar(g, W, H);
-    else _drawKnight(g, W, H);
-  } else {
-    if (skinName === 'goblin') _drawGoblin(g, W, H);
-    else _drawOrc(g, W, H);
-  }
-  g.generateTexture(key, W, H);
+
+  const draw = (gg, ox, dy, squash) => {
+    gg.save();
+    gg.translateCanvas(ox, dy);
+    if (squash) { gg.translateCanvas(0, H * 0.04); gg.scaleCanvas(1.04, 0.96); }
+    if (type === 'charger') {
+      if (skinName === 'boar') _drawBoar(gg, W, H);
+      else _drawKnight(gg, W, H);
+    } else {
+      if (skinName === 'goblin') _drawGoblin(gg, W, H);
+      else _drawOrc(gg, W, H);
+    }
+    gg.restore();
+  };
+  // Frame 0 : repos · Frame 1 : rebond de marche (léger squash + descente)
+  draw(g, 0, 0, false);
+  draw(g, W, 2, true);
+
+  g.generateTexture(key, W * COUNT, H);
   g.destroy();
+
+  const tex = scene.textures.get(key);
+  for (let i = 0; i < COUNT; i++) {
+    if (!tex.has(String(i))) tex.add(i, 0, i * W, 0, W, H);
+  }
 }
 
 function _drawOrc(g, W, H) {

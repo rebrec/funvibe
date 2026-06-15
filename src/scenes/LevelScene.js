@@ -7,6 +7,7 @@ import Enemy from '../entities/Enemy.js';
 import Projectile from '../entities/Projectile.js';
 import SaveManager from '../core/SaveManager.js';
 import WorldLoader from '../world/WorldLoader.js';
+import { smoothCurve } from '../world/curve.js';
 import level1Data from '../data/levels/level1.json';
 
 const CUSTOM_LEVELS_KEY = 'customLevels';
@@ -58,6 +59,17 @@ export default class LevelScene extends Phaser.Scene {
     this._worldH = H;
     this._start  = levelData.start ?? START;
     this._deathY = H - 20;
+
+    // Zoom caméra : défaut + valeur "large" pour les niveaux hauts.
+    const camCfg = levelData.camera ?? {};
+    this._camZoomDefault = camCfg.zoom ?? 1;
+    this._camZoomWide    = camCfg.wide ?? 0.7;
+    this._camZoomMin     = camCfg.min ?? 0.45;
+    this._camZoomMax     = camCfg.max ?? 1.3;
+    this._camManualZoom  = null;   // override molette (null = auto)
+    this._camManualTimer = 0;
+    this._lastGroundY    = this._start.y;
+
     this.matter.world.setBounds(0, 0, W, H, 128, true, true, true, false);
     this.cameras.main.setBounds(0, 0, W, H);
     this.cameras.main.setBackgroundColor(this.theme.background);
@@ -67,14 +79,23 @@ export default class LevelScene extends Phaser.Scene {
     this.enemies = [];
     this.projectiles = new Map(); // body Matter -> Projectile
 
-    buildLevelDecor(this, this.theme, W, H, 1800);
+    buildLevelDecor(this, this.theme, W, H, levelData.horizon ?? 1800);
     WorldLoader.build(this, levelData, this.theme);
 
     this.player = new Player(this, this._start.x, this._start.y);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
     this.cameras.main.setDeadzone(160, 180);
+    this.cameras.main.setZoom(this._camZoomDefault);
     this.camLookaheadX = 0;
     this.camLookaheadY = 0;
+
+    // Molette = survol manuel temporaire du zoom (revient en auto après inactivité).
+    this.input.on('wheel', (pointer, over, dx, dy) => {
+      const base = this._camManualZoom ?? this.cameras.main.zoom;
+      const z = Phaser.Math.Clamp(base - dy * 0.001, this._camZoomMin, this._camZoomMax);
+      this._camManualZoom = z;
+      this._camManualTimer = 2500;
+    });
 
     // Synchronise vie + munitions initiales dans le registry (le joueur lit déjà
     // maxHealth / maxAmmo depuis le registry via les upgrades — on ne les réécrit pas).
@@ -85,6 +106,7 @@ export default class LevelScene extends Phaser.Scene {
     this.createHelpOverlay();
     const portal = levelData.hubPortal ?? { x: 100, y: 1750, radius: 140 };
     this._buildHubPortal(portal);
+    if (levelData.finish) this._buildFinish(levelData.finish);
 
     // Informe si niveau custom chargé
     if (this._customLevelIdx >= 0) {
@@ -169,6 +191,52 @@ export default class LevelScene extends Phaser.Scene {
 
     const vis = this.add.rectangle(cx, cy, len, SLOPE_THICKNESS, color);
     vis.setRotation(angle);
+  }
+
+  // Colline/relief arrondi type Sonic : crête lissée par spline à partir de
+  // points de contrôle. Visuel plein jusqu'au bas du monde + bande d'herbe ;
+  // physique = chaîne de petits segments inclinés (suivi de tangente déjà géré).
+  addCurve(points) {
+    if (!points || points.length < 2) return;
+    const surface = smoothCurve(points, 8); // crête lissée (Catmull-Rom)
+
+    const worldH = this._worldH ?? WORLD_HEIGHT;
+
+    // ── Visuel plein (terre) jusqu'en bas ──
+    const g = this.add.graphics().setDepth(-3);
+    g.fillStyle(this.theme.groundBody, 1);
+    g.beginPath();
+    g.moveTo(surface[0].x, surface[0].y);
+    for (let i = 1; i < surface.length; i++) g.lineTo(surface[i].x, surface[i].y);
+    g.lineTo(surface[surface.length - 1].x, worldH);
+    g.lineTo(surface[0].x, worldH);
+    g.closePath();
+    g.fillPath();
+
+    // ── Bande d'herbe le long de la crête + segments physiques ──
+    const grass = this.add.graphics().setDepth(-2);
+    grass.lineStyle(10, this.theme.groundTop, 1);
+    grass.beginPath();
+    grass.moveTo(surface[0].x, surface[0].y);
+    for (let i = 1; i < surface.length; i++) grass.lineTo(surface[i].x, surface[i].y);
+    grass.strokePath();
+
+    for (let i = 0; i < surface.length - 1; i++) {
+      const a = surface[i];
+      const b = surface[i + 1];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 1) continue;
+      const angle = Math.atan2(dy, dx);
+      const ndx = -Math.sin(angle);
+      const ndy = Math.cos(angle);
+      const cx = (a.x + b.x) / 2 + (SLOPE_THICKNESS / 2) * ndx;
+      const cy = (a.y + b.y) / 2 + (SLOPE_THICKNESS / 2) * ndy;
+      this.matter.add.rectangle(cx, cy, len + 2, SLOPE_THICKNESS, {
+        isStatic: true, friction: 0, angle, label: 'slope',
+      });
+    }
   }
 
   addCoin(x, y) {
@@ -293,11 +361,49 @@ export default class LevelScene extends Phaser.Scene {
       .setScrollFactor(0).setDepth(100).setOrigin(0.5).setVisible(false);
   }
 
+  // Drapeau d'arrivée (zone de fin de niveau).
+  _buildFinish({ x, y }) {
+    const poleTop = y - 90;
+    this.add.rectangle(x, (y + poleTop) / 2, 5, y - poleTop, 0xeeeeee).setDepth(4);
+    // Drapeau à damier
+    const flag = this.add.graphics().setDepth(4);
+    const cell = 9, cols = 4, rows = 3;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        flag.fillStyle((r + c) % 2 === 0 ? 0x222222 : 0xffffff, 1);
+        flag.fillRect(x + 3 + c * cell, poleTop + r * cell, cell, cell);
+      }
+    }
+    this.add.text(x, poleTop - 8, 'ARRIVÉE', {
+      fontFamily: 'monospace', fontSize: '14px', color: '#ffffff',
+      backgroundColor: '#00000088', padding: { x: 6, y: 3 },
+    }).setOrigin(0.5, 1).setDepth(4);
+    this.finishZone = { x, y };
+    this._finished = false;
+  }
+
+  _completeLevel() {
+    if (this._finished) return;
+    this._finished = true;
+    const t = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2, 'NIVEAU TERMINÉ !', {
+      fontFamily: 'monospace', fontSize: '40px', color: '#ffe066', fontStyle: 'bold',
+      backgroundColor: '#000000aa', padding: { x: 20, y: 14 },
+    }).setScrollFactor(0).setDepth(300).setOrigin(0.5);
+    this.tweens.add({ targets: t, scale: { from: 0.6, to: 1 }, duration: 300, ease: 'Back.easeOut' });
+    this.time.delayedCall(1800, () => this.goToHub());
+  }
+
   goToHub() {
     this.scene.stop('UIScene');
-    this.scene.stop();
-    this.scene.resume('HubScene');
-    this.scene.launch('UIScene');
+    if (this.scene.isPaused('HubScene')) {
+      // Venue normale depuis le hub (mis en pause) → on le réveille.
+      this.scene.stop();
+      this.scene.resume('HubScene');
+      this.scene.launch('UIScene');
+    } else {
+      // Venue d'un niveau custom (hub stoppé) → on le redémarre (relance l'UIScene).
+      this.scene.start('HubScene');
+    }
   }
 
   createHelpOverlay() {
@@ -341,6 +447,23 @@ export default class LevelScene extends Phaser.Scene {
       this.camLookaheadY = Phaser.Math.Linear(this.camLookaheadY, -dirY * CAM_LOOKAHEAD_Y, CAM_LOOKAHEAD_Y_LERP);
     }
     this.cameras.main.setFollowOffset(this.camLookaheadX, this.camLookaheadY);
+
+    // --- Zoom caméra ---
+    const cam = this.cameras.main;
+    if (this.player.isGrounded) this._lastGroundY = this.player.y;
+    let targetZoom;
+    if (this._camManualTimer > 0) {
+      // Survol manuel à la molette
+      this._camManualTimer -= delta;
+      targetZoom = this._camManualZoom;
+    } else {
+      this._camManualZoom = null;
+      // Dézoom si on monte/descend vite ou si on est haut au-dessus du dernier sol.
+      const aboveGround = this._lastGroundY - this.player.y;
+      const wide = Math.abs(vy) > 6 || aboveGround > 600;
+      targetZoom = wide ? this._camZoomWide : this._camZoomDefault;
+    }
+    cam.setZoom(Phaser.Math.Linear(cam.zoom, targetZoom, 0.05));
 
     // --- Ennemis & combat ---
     for (const e of this.enemies) e.update(delta);
@@ -392,6 +515,12 @@ export default class LevelScene extends Phaser.Scene {
     ) < this.hubPortal.radius;
     this.hubHint.setVisible(nearHub);
     if (nearHub && this.input_.isInteractJustPressed()) this.goToHub();
+
+    // Arrivée : franchir la zone termine le niveau.
+    if (this.finishZone && !this._finished) {
+      const d = Phaser.Math.Distance.Between(this.player.x, this.player.y, this.finishZone.x, this.finishZone.y);
+      if (d < 70) this._completeLevel();
+    }
 
     // Chute dans le vide : on réapparaît au départ (sans perdre de vie).
     if (this.player.y > this._deathY) {

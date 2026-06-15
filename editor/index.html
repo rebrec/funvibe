@@ -13,8 +13,15 @@
         <span class="tool-label">Terrain</span>
         <button class="tool-btn active" data-tool="ground">Sol</button>
         <button class="tool-btn" data-tool="platform">Plateforme</button>
-        <button class="tool-btn" data-tool="slope">Pente</button>
+        <button class="tool-btn" data-tool="slope">Pente droite</button>
+        <button class="tool-btn" data-tool="curve">Pente douce ⤴</button>
         <button class="tool-btn" data-tool="landmark">Repère</button>
+      </div>
+      <div class="tool-group">
+        <span class="tool-label">Jeu</span>
+        <button class="tool-btn" data-tool="start">🟢 Début</button>
+        <button class="tool-btn" data-tool="finish">🏁 Arrivée</button>
+        <button class="tool-btn" data-tool="select">↖ Sélection</button>
       </div>
       <div class="tool-group">
         <span class="tool-label">Entités</span>
@@ -24,6 +31,11 @@
         <button class="tool-btn" data-tool="crystal">Cristal</button>
       </div>
       <div class="tool-group">
+        <span class="tool-label">Monde</span>
+        <label>Larg. : <input type="number" id="world-w" value="4000" min="500" step="100" /></label>
+        <label>Haut. : <input type="number" id="world-h" value="2200" min="500" step="100" /></label>
+      </div>
+      <div class="tool-group">
         <span class="tool-label">Vue</span>
         <label>Grille : <input type="number" id="snap" value="20" min="1" max="200" /></label>
         <label>Zoom : <input type="range" id="zoom" min="0.1" max="2" step="0.05" value="0.5" /></label>
@@ -31,10 +43,11 @@
       </div>
       <div class="tool-group">
         <button id="btn-new" class="action-btn">Nouveau</button>
-        <button id="btn-load" class="action-btn">Charger</button>
+        <button id="btn-import" class="action-btn">Importer .json</button>
         <button id="btn-save" class="action-btn primary">Sauvegarder</button>
         <button id="btn-export" class="action-btn">Exporter JSON</button>
       </div>
+      <input type="file" id="file-input" accept="application/json,.json" style="display:none" />
     </div>
 
     <div id="main">
