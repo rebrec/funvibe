@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { GAME, PLAYER, ENEMY } from '../core/Constants.js';
+import { GAME, PLAYER, ENEMY, PHYSICS } from '../core/Constants.js';
+import { getTheme, buildLevelDecor } from '../core/Skins.js';
 import InputManager from '../core/InputManager.js';
 import Player from '../entities/Player.js';
 import Enemy from '../entities/Enemy.js';
@@ -17,12 +18,8 @@ const WORLD_HEIGHT = 2200;
 const START = { x: 120, y: 1720 };
 const DEATH_Y = WORLD_HEIGHT - 20;
 
-const COL = {
-  ground: 0x6b4f2a,
-  plat: 0x8a8f98,
-  slope: 0x7a5a30,
-  landmark: 0xc06be0,
-};
+// COL conservé pour la couleur landmark uniquement ; le reste utilise le thème.
+const COL_LANDMARK = 0xc06be0;
 
 const PLATFORM_THICKNESS = 28;
 const SLOPE_THICKNESS = 44;
@@ -41,15 +38,19 @@ export default class LevelScene extends Phaser.Scene {
   }
 
   create() {
+    this.theme = getTheme(this.registry.get('theme') ?? 'forest');
+    this.keyF2 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F2);
+
     this.matter.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT, 128, true, true, true, false);
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
-    this.cameras.main.setBackgroundColor(GAME.BACKGROUND);
+    this.cameras.main.setBackgroundColor(this.theme.background);
 
     this.input_ = new InputManager(this);
     this.collectibles = new Map(); // body Matter -> { vis, type }
     this.enemies = [];
     this.projectiles = new Map(); // body Matter -> Projectile
 
+    buildLevelDecor(this, this.theme, WORLD_WIDTH, 1800);
     this.buildLevel();
     this.buildCollectibles();
     this.buildEnemies();
@@ -80,59 +81,60 @@ export default class LevelScene extends Phaser.Scene {
   }
 
   buildLevel() {
+    const P = this.theme.platColor;
+
     // --- A. Départ + petite montée par plateformes ---
-    this.addPlatform(0, 1800, 700, COL.ground);
-    this.addSlope(700, 1800, 1000, 1650); // pente douce
-    this.addPlatform(1000, 1650, 200, COL.plat);
-    this.addPlatform(1300, 1650, 180, COL.plat);
-    this.addPlatform(1560, 1560, 160, COL.plat);
-    this.addPlatform(1800, 1470, 160, COL.plat);
-    this.addPlatform(2040, 1470, 200, COL.plat);
-    this.addSlope(2240, 1470, 2520, 1650); // redescente
-    this.addPlatform(2520, 1650, 260, COL.plat);
+    this.addGroundSection(0, 1800, 700);
+    this.addSlope(700, 1800, 1000, 1650);
+    this.addPlatform(1000, 1650, 200, P, true);
+    this.addPlatform(1300, 1650, 180, P, true);
+    this.addPlatform(1560, 1560, 160, P, true);
+    this.addPlatform(1800, 1470, 160, P, true);
+    this.addPlatform(2040, 1470, 200, P, true);
+    this.addSlope(2240, 1470, 2520, 1650);
+    this.addPlatform(2520, 1650, 260, P, true);
 
     // --- B. Trou, puis pente raide et tour d'escalade ---
-    this.addPlatform(2960, 1700, 240, COL.plat); // après le trou
-    this.addSlope(3200, 1700, 3380, 1450); // pente raide
-    this.addPlatform(3380, 1450, 200, COL.plat);
-    // tour en quinconce (sauts / double-sauts), écarts réguliers ~110 px
-    this.addPlatform(3640, 1340, 150, COL.plat);
-    this.addPlatform(3880, 1230, 150, COL.plat);
-    this.addPlatform(3640, 1120, 150, COL.plat);
-    this.addPlatform(3880, 1010, 150, COL.plat);
-    this.addPlatform(3640, 900, 150, COL.plat);
-    this.addPlatform(3860, 790, 320, COL.plat); // palier sommet
+    this.addPlatform(2960, 1700, 240, P, true);
+    this.addSlope(3200, 1700, 3380, 1450);
+    this.addPlatform(3380, 1450, 200, P, true);
+    this.addPlatform(3640, 1340, 150, P, true);
+    this.addPlatform(3880, 1230, 150, P, true);
+    this.addPlatform(3640, 1120, 150, P, true);
+    this.addPlatform(3880, 1010, 150, P, true);
+    this.addPlatform(3640, 900, 150, P, true);
+    this.addPlatform(3860, 790, 320, P, true);
 
     // --- C. Longue section EN HAUTEUR, puis descente par pentes ---
-    this.addPlatform(4260, 790, 200, COL.plat);
-    this.addPlatform(4560, 850, 180, COL.plat);
-    this.addPlatform(4840, 790, 180, COL.plat);
-    this.addSlope(5100, 790, 5400, 1050); // descente
-    this.addPlatform(5400, 1050, 300, COL.plat);
-    this.addPlatform(5760, 1150, 220, COL.plat);
-    this.addSlope(5980, 1150, 6300, 1400); // descente
-    this.addPlatform(6300, 1400, 360, COL.plat);
-    this.addPlatform(6720, 1500, 260, COL.plat);
+    this.addPlatform(4260, 790, 200, P, true);
+    this.addPlatform(4560, 850, 180, P, true);
+    this.addPlatform(4840, 790, 180, P, true);
+    this.addSlope(5100, 790, 5400, 1050);
+    this.addPlatform(5400, 1050, 300, P, true);
+    this.addPlatform(5760, 1150, 220, P, true);
+    this.addSlope(5980, 1150, 6300, 1400);
+    this.addPlatform(6300, 1400, 360, P, true);
+    this.addPlatform(6720, 1500, 260, P, true);
 
     // --- D. Longue ligne au sol (section "vitesse") avec collines ---
-    this.addPlatform(7040, 1600, 900, COL.ground);
-    this.addSlope(7940, 1600, 8300, 1450); // colline (montée douce)
-    this.addPlatform(8300, 1450, 200, COL.plat);
-    this.addSlope(8540, 1450, 8900, 1650); // redescente
-    this.addPlatform(8900, 1650, 400, COL.ground);
+    this.addGroundSection(7040, 1600, 900);
+    this.addSlope(7940, 1600, 8300, 1450);
+    this.addPlatform(8300, 1450, 200, P, true);
+    this.addSlope(8540, 1450, 8900, 1650);
+    this.addGroundSection(8900, 1650, 400);
 
     // --- E. Trou, dernière tour, et repère final ---
-    this.addPlatform(9420, 1650, 260, COL.plat);
-    this.addPlatform(9700, 1540, 150, COL.plat);
-    this.addPlatform(9940, 1430, 150, COL.plat);
-    this.addPlatform(9700, 1320, 150, COL.plat);
-    this.addPlatform(9940, 1210, 150, COL.plat);
-    this.addPlatform(9720, 1100, 300, COL.plat);
-    this.addPlatform(10120, 1100, 200, COL.plat);
-    this.addPlatform(10420, 1040, 180, COL.plat);
-    this.addPlatform(10700, 980, 180, COL.plat);
-    this.addPlatform(10980, 900, 240, COL.landmark); // repère final (arrivée du parcours de test)
-    this.addPlatform(11260, 1100, 500, COL.ground);
+    this.addPlatform(9420, 1650, 260, P, true);
+    this.addPlatform(9700, 1540, 150, P, true);
+    this.addPlatform(9940, 1430, 150, P, true);
+    this.addPlatform(9700, 1320, 150, P, true);
+    this.addPlatform(9940, 1210, 150, P, true);
+    this.addPlatform(9720, 1100, 300, P, true);
+    this.addPlatform(10120, 1100, 200, P, true);
+    this.addPlatform(10420, 1040, 180, P, true);
+    this.addPlatform(10700, 980, 180, P, true);
+    this.addPlatform(10980, 900, 240, COL_LANDMARK, true); // repère final
+    this.addGroundSection(11260, 1100, 500);
 
     this.add
       .text(11100, 850, 'ARRIVÉE', {
@@ -144,22 +146,51 @@ export default class LevelScene extends Phaser.Scene {
       .setOrigin(0.5, 1);
   }
 
-  // Plateforme horizontale (corps statique Matter + visuel en un objet).
-  addPlatform(x, topY, width, color) {
+  // Sol avec remplissage terreux (terrain "plein" visuellement).
+  addGroundSection(x, topY, width) {
+    // Remplissage terre (jusqu'au bas du monde)
+    const fillH = WORLD_HEIGHT - topY;
+    this.add.rectangle(
+      x + width / 2, topY + fillH / 2, width, fillH, this.theme.groundBody
+    ).setDepth(-3);
+    // Bande de surface (herbe / neige / sable)
+    this.add.rectangle(
+      x + width / 2, topY + 5, width, 10, this.theme.groundTop
+    ).setDepth(-2);
+    // Corps physique (transparent, couvre la surface)
     const rect = this.add.rectangle(
-      x + width / 2,
-      topY + PLATFORM_THICKNESS / 2,
-      width,
-      PLATFORM_THICKNESS,
-      color
+      x + width / 2, topY + PLATFORM_THICKNESS / 2, width, PLATFORM_THICKNESS,
+      this.theme.groundBody
     );
     this.matter.add.gameObject(rect, { isStatic: true, friction: 0, label: 'platform' });
     return rect;
   }
 
+  // Plateforme horizontale (corps statique Matter + visuel en un objet).
+  // oneWay=true → traversable par le bas (saut), bloquante par le dessus (atterrissage).
+  addPlatform(x, topY, width, color, oneWay = false) {
+    const rect = this.add.rectangle(
+      x + width / 2, topY + PLATFORM_THICKNESS / 2, width, PLATFORM_THICKNESS, color
+    );
+    // Filet de lumière sur le dessus de la plateforme
+    this.add.rectangle(
+      x + width / 2, topY + 3, width - 6, 4, this.theme.platHighlight, 0.45
+    );
+    // Ombre légère en-dessous
+    this.add.rectangle(
+      x + width / 2 + 3, topY + PLATFORM_THICKNESS + 4, width, 6, 0x000000, 0.22
+    ).setDepth(-1);
+    const cfg = oneWay
+      ? { isStatic: true, friction: 0, label: 'oneway',
+          collisionFilter: { category: PHYSICS.CATEGORY_ONEWAY, mask: 0xFFFFFFFF } }
+      : { isStatic: true, friction: 0, label: 'platform' };
+    this.matter.add.gameObject(rect, cfg);
+    return rect;
+  }
+
   // Pente définie par sa ligne de surface (x1,y1)->(x2,y2), x1 < x2.
-  // Corps statique = rectangle pivoté dont le bord supérieur suit la surface.
-  addSlope(x1, y1, x2, y2, color = COL.slope) {
+  addSlope(x1, y1, x2, y2, color) {
+    color = color ?? this.theme.slopeColor;
     const dx = x2 - x1;
     const dy = y2 - y1;
     const len = Math.hypot(dx, dy);
@@ -245,14 +276,18 @@ export default class LevelScene extends Phaser.Scene {
 
   addCoin(x, y) {
     const body = this.matter.add.circle(x, y, 12, { isStatic: true, isSensor: true, label: 'coin' });
-    const vis = this.add.circle(x, y, 11, 0xffd23f).setStrokeStyle(2, 0xb8860b);
+    const vis = this.add.circle(x, y, 11, this.theme.coinColor)
+      .setStrokeStyle(2, this.theme.coinStroke);
     this.collectibles.set(body, { vis, type: 'coin' });
     this.tweens.add({ targets: vis, scale: 1.18, duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   }
 
   addCrystal(x, y) {
     const body = this.matter.add.rectangle(x, y, 22, 22, { isStatic: true, isSensor: true, label: 'crystal' });
-    const vis = this.add.rectangle(x, y, 18, 18, 0x49e0e0).setStrokeStyle(2, 0x1f8a8a).setRotation(Math.PI / 4);
+    // Losange (carré à 45°) aux couleurs du thème
+    const vis = this.add.rectangle(x, y, 16, 16, this.theme.crystalColor)
+      .setStrokeStyle(2, this.theme.crystalStroke)
+      .setRotation(Math.PI / 4);
     this.collectibles.set(body, { vis, type: 'crystal' });
     this.tweens.add({ targets: vis, angle: '+=360', duration: 3200, repeat: -1 });
   }
@@ -354,13 +389,17 @@ export default class LevelScene extends Phaser.Scene {
   }
 
   buildHubPortal() {
-    const x = 60, y = 1760;
-    this.add.circle(x, y, 28, 0x6633cc, 0.85);
-    this.add.circle(x, y, 20, 0x9966ff, 0.7);
-    this.add.text(x, y - 38, 'HUB', {
-      fontFamily: 'monospace', fontSize: '13px', color: '#cc99ff', fontStyle: 'bold',
+    const x = 100, y = 1750;
+    const halo = this.add.circle(x, y, 44, 0x6633cc, 0.8);
+    const core = this.add.circle(x, y, 32, 0x9966ff, 0.65);
+    this.tweens.add({
+      targets: [halo, core], scale: { from: 0.92, to: 1.08 },
+      duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
+    this.add.text(x, y - 54, 'VILLAGE', {
+      fontFamily: 'monospace', fontSize: '15px', color: '#cc99ff', fontStyle: 'bold',
     }).setOrigin(0.5, 1);
-    this.hubPortal = { x, y };
+    this.hubPortal = { x, y, radius: 140 };
     this.hubHint = this.add
       .text(GAME.WIDTH / 2, GAME.HEIGHT - 100, 'E : retourner au village', {
         fontFamily: 'monospace', fontSize: '15px', color: '#ffffff',
@@ -371,7 +410,9 @@ export default class LevelScene extends Phaser.Scene {
 
   goToHub() {
     this.scene.stop('UIScene');
-    this.scene.start('HubScene');
+    this.scene.stop();
+    this.scene.resume('HubScene');
+    this.scene.launch('UIScene');
   }
 
   createHelpOverlay() {
@@ -392,6 +433,13 @@ export default class LevelScene extends Phaser.Scene {
   }
 
   update(time, delta) {
+    // Menu debug skins (F2)
+    if (Phaser.Input.Keyboard.JustDown(this.keyF2)) {
+      this.scene.pause();
+      this.scene.launch('SkinDebugScene', { from: 'LevelScene' });
+      return;
+    }
+
     this.player.update(delta, this.input_);
 
     // Caméra qui anticipe : on se décale dans le sens du déplacement pour voir
@@ -456,7 +504,7 @@ export default class LevelScene extends Phaser.Scene {
     // Portail retour au hub
     const nearHub = Phaser.Math.Distance.Between(
       this.player.x, this.player.y, this.hubPortal.x, this.hubPortal.y
-    ) < 80;
+    ) < this.hubPortal.radius;
     this.hubHint.setVisible(nearHub);
     if (nearHub && this.input_.isInteractJustPressed()) this.goToHub();
 

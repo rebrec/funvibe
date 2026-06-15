@@ -11,7 +11,8 @@ const MatterLib = Phaser.Physics.Matter.Matter;
 // traversent entre eux mais restent solides face au sol et au joueur.
 export default class Enemy extends Phaser.Physics.Matter.Sprite {
   constructor(scene, x, y, { minX, maxX, speed, hp, behavior } = {}) {
-    super(scene.matter.world, x, y, 'enemy');
+    const textureKey = (behavior ?? 'walker') === 'charger' ? 'enemy-charger' : 'enemy-walker';
+    super(scene.matter.world, x, y, textureKey);
     scene.add.existing(this);
 
     const body = MatterLib.Bodies.rectangle(x, y, ENEMY.WIDTH, ENEMY.HEIGHT, {

@@ -5,6 +5,7 @@ import HubScene from './scenes/HubScene.js';
 import LevelScene from './scenes/LevelScene.js';
 import UIScene from './scenes/UIScene.js';
 import ShopScene from './scenes/ShopScene.js';
+import SkinDebugScene from './scenes/SkinDebugScene.js';
 
 const config = {
   type: Phaser.AUTO,
@@ -24,7 +25,7 @@ const config = {
       debug: false, // passer à true pour visualiser les corps physiques
     },
   },
-  scene: [BootScene, HubScene, LevelScene, UIScene, ShopScene],
+  scene: [BootScene, HubScene, LevelScene, UIScene, ShopScene, SkinDebugScene],
 };
 
 // eslint-disable-next-line no-new

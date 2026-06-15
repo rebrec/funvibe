@@ -1,13 +1,14 @@
 import Phaser from 'phaser';
 import { GAME, PLAYER } from '../core/Constants.js';
+import { getTheme, buildHubDecor } from '../core/Skins.js';
 import InputManager from '../core/InputManager.js';
 import Player from '../entities/Player.js';
 
 const HUB_W = 1400;
 const HUB_H = 500;
-const GROUND_Y = 370; // y de la surface du sol
+const GROUND_Y = 370;
 const START = { x: 200, y: GROUND_Y - PLAYER.HEIGHT / 2 };
-const PLAT_T = 28; // épaisseur des plateformes
+const PLAT_T = 28;
 
 export default class HubScene extends Phaser.Scene {
   constructor() {
@@ -15,13 +16,17 @@ export default class HubScene extends Phaser.Scene {
   }
 
   create() {
+    this.theme = getTheme(this.registry.get('theme') ?? 'forest');
+    this.keyF2 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F2);
+
     this.matter.world.setBounds(0, 0, HUB_W, HUB_H, 64, true, true, true, false);
     this.cameras.main.setBounds(0, 0, HUB_W, HUB_H);
-    this.cameras.main.setBackgroundColor('#87ceeb');
+    this.cameras.main.setBackgroundColor(this.theme.background);
 
     this.input_ = new InputManager(this);
     this.doors = [];
 
+    buildHubDecor(this, this.theme, HUB_W, GROUND_Y);
     this.buildHub();
 
     this.player = new Player(this, START.x, START.y);
@@ -40,28 +45,41 @@ export default class HubScene extends Phaser.Scene {
   addPlatform(x, topY, width, color) {
     const rect = this.add.rectangle(x + width / 2, topY + PLAT_T / 2, width, PLAT_T, color);
     this.matter.add.gameObject(rect, { isStatic: true, friction: 0, label: 'platform' });
+    return rect;
+  }
+
+  addGroundSection(x, topY, width) {
+    const fillH = HUB_H - topY;
+    this.add.rectangle(x + width / 2, topY + fillH / 2, width, fillH, this.theme.groundBody).setDepth(-3);
+    this.add.rectangle(x + width / 2, topY + 5, width, 10, this.theme.groundTop).setDepth(-2);
+    const rect = this.add.rectangle(x + width / 2, topY + PLAT_T / 2, width, PLAT_T, this.theme.groundBody);
+    this.matter.add.gameObject(rect, { isStatic: true, friction: 0, label: 'platform' });
+    return rect;
   }
 
   buildHub() {
-    // Sol
-    this.addPlatform(0, GROUND_Y, HUB_W, 0x6b4f2a);
+    // Sol thématique
+    this.addGroundSection(0, GROUND_Y, HUB_W);
 
-    // Petites plateformes décoratives (pas de sol sous les pieds du joueur ici)
-    this.addPlatform(460,  GROUND_Y - 100, 110, 0x8a8f98);
-    this.addPlatform(660,  GROUND_Y - 155, 90,  0x8a8f98);
-
-    // === Bâtiment BOUTIQUE (x=520) ===
+    // === Bâtiment BOUTIQUE ===
     const bx = 520, bw = 190, bh = 126;
-    this.add.rectangle(bx, GROUND_Y - bh / 2, bw, bh, 0xc09060);       // murs
-    this.add.rectangle(bx, GROUND_Y - bh - 7, bw + 20, 14, 0x8a5a20);  // toit
+    // Murs (couleur qui contraste avec le thème mais reste "bâtiment")
+    this.add.rectangle(bx, GROUND_Y - bh / 2, bw, bh, 0xc09060);
+    // Toit
+    this.add.rectangle(bx, GROUND_Y - bh - 7, bw + 20, 14, 0x8a5a20);
+    // Enseigne
     this.add.text(bx, GROUND_Y - bh + 12, 'BOUTIQUE', {
       fontFamily: 'monospace', fontSize: '18px', color: '#ffe0a0', fontStyle: 'bold',
     }).setOrigin(0.5, 0);
-    this.add.rectangle(bx, GROUND_Y - 28, 44, 56, 0x3a1500); // porte
+    // Porte
+    this.add.rectangle(bx, GROUND_Y - 28, 44, 56, 0x3a1500);
+    // Fenêtres
+    this.add.rectangle(bx - 55, GROUND_Y - 80, 28, 28, 0x88ccff, 0.6);
+    this.add.rectangle(bx + 55, GROUND_Y - 80, 28, 28, 0x88ccff, 0.6);
 
     this.doors.push({ x: bx, y: GROUND_Y, action: 'shop', hint: 'E : entrer dans la boutique' });
 
-    // === Portail NIVEAU (x=950) ===
+    // === Portail NIVEAU ===
     const px = 950, py = GROUND_Y - 56;
     const halo = this.add.circle(px, py, 44, 0x6633cc, 0.8);
     const core = this.add.circle(px, py, 34, 0x9966ff, 0.6);
@@ -72,27 +90,73 @@ export default class HubScene extends Phaser.Scene {
     this.add.text(px, py - 58, 'NIVEAU', {
       fontFamily: 'monospace', fontSize: '16px', color: '#cc99ff', fontStyle: 'bold',
     }).setOrigin(0.5, 1);
-
     this.doors.push({ x: px, y: py, action: 'level', hint: 'E : entrer dans le niveau' });
 
-    // Arbres (tronc + feuillage)
-    [310, 770, 1160].forEach((tx) => {
-      this.add.rectangle(tx, GROUND_Y - 20, 12, 40, 0x5a3a10);
-      this.add.circle(tx, GROUND_Y - 62, 28, 0x228844);
-    });
+    // Arbres (style selon thème)
+    [310, 770, 1160].forEach(tx => this._drawTree(tx, GROUND_Y));
 
-    // Message de bienvenue
+    // Message de bienvenue (couleur lisible selon thème)
+    const textColor = this.theme.decorFn === 'volcano' ? '#ff9966' : '#ffffff';
     this.add.text(200, GROUND_Y - 80, 'Bienvenue au village !', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#1a0800',
+      fontFamily: 'monospace', fontSize: '14px', color: textColor,
     }).setOrigin(0.5, 1);
 
     // Aide touches (fixée à l'écran)
-    this.add.text(GAME.WIDTH / 2, GAME.HEIGHT - 70, 'Fleches / A-D : se deplacer   *   Espace : sauter', {
-      fontFamily: 'monospace', fontSize: '14px', color: '#1a1a1a',
-    }).setScrollFactor(0).setDepth(10);
+    this.add.text(GAME.WIDTH / 2, GAME.HEIGHT - 70,
+      'Flèches/A-D : se déplacer   ·   Espace : sauter   ·   F2 : skins & thèmes', {
+        fontFamily: 'monospace', fontSize: '13px', color: '#cccccc',
+      }).setScrollFactor(0).setDepth(10);
+  }
+
+  _drawTree(x, groundY) {
+    const fn = this.theme.decorFn;
+    if (fn === 'snow') {
+      // Sapin : triangle foncé
+      const g = this.add.graphics();
+      g.fillStyle(0x2a5a2a, 1);
+      g.fillTriangle(x - 28, groundY, x, groundY - 110, x + 28, groundY);
+      g.fillTriangle(x - 20, groundY - 55, x, groundY - 130, x + 20, groundY - 55);
+      g.fillStyle(0x4a2a08, 1);
+      g.fillRect(x - 5, groundY - 15, 10, 15);
+    } else if (fn === 'sea') {
+      // Palmier : tronc courbe (approché par rectangles décalés) + feuilles
+      const g = this.add.graphics();
+      g.fillStyle(0x7a5a20, 1);
+      g.fillRect(x - 5, groundY - 80, 10, 80);
+      g.fillRect(x - 3, groundY - 120, 8, 40);
+      // Feuilles (triangles verts)
+      g.fillStyle(0x228833, 1);
+      g.fillTriangle(x - 5, groundY - 120, x + 60, groundY - 140, x + 40, groundY - 100);
+      g.fillTriangle(x + 5, groundY - 120, x - 60, groundY - 145, x - 40, groundY - 105);
+      g.fillTriangle(x, groundY - 120, x + 20, groundY - 185, x + 50, groundY - 155);
+    } else if (fn === 'volcano') {
+      // Arbre mort (tronc sans feuilles, branches sèches)
+      const g = this.add.graphics();
+      g.fillStyle(0x2a1808, 1);
+      g.fillRect(x - 5, groundY - 90, 10, 90);
+      g.fillRect(x, groundY - 70, 30, 5);
+      g.fillRect(x - 30, groundY - 50, 30, 5);
+    } else {
+      // Forêt : tronc + feuillage circulaire (défaut)
+      const g = this.add.graphics();
+      g.fillStyle(0x5a3a10, 1);
+      g.fillRect(x - 6, groundY - 30, 12, 30);
+      g.fillStyle(0x1a6622, 1);
+      g.fillCircle(x, groundY - 65, 32);
+      g.fillStyle(0x228833, 1);
+      g.fillCircle(x - 12, groundY - 75, 20);
+      g.fillCircle(x + 12, groundY - 78, 22);
+    }
   }
 
   update(time, delta) {
+    // Menu debug skins (F2)
+    if (Phaser.Input.Keyboard.JustDown(this.keyF2)) {
+      this.scene.pause();
+      this.scene.launch('SkinDebugScene', { from: 'HubScene' });
+      return;
+    }
+
     this.player.update(delta, this.input_);
 
     let nearDoor = null;
@@ -122,7 +186,8 @@ export default class HubScene extends Phaser.Scene {
       this.scene.launch('ShopScene');
     } else if (action === 'level') {
       this.scene.stop('UIScene');
-      this.scene.start('LevelScene');
+      this.scene.pause();
+      this.scene.launch('LevelScene');
     }
   }
 }
