@@ -73,7 +73,8 @@ export const PROJECTILE = {
 export const SHOP = {
   ITEMS: [
     { id: 'maxHealth',  label: '+1 coeur max',    desc: 'PV max +1',              costs: [5, 10],  maxLevel: 2 },
-    { id: 'maxJumps',   label: '+1 saut aerien',  desc: 'Sauts possibles +1',     costs: [8, 14],  maxLevel: 2 },
+    // Saut : base 2 + 13 niveaux = jusqu'à 15 sauts cumulés.
+    { id: 'maxJumps',   label: '+1 saut',         desc: 'Sauts cumulés +1 (max 15)', costs: [8, 14, 22, 32, 44, 58, 74, 92, 112, 134, 158, 184, 212], maxLevel: 13 },
     { id: 'maxAmmo',    label: '+2 shurikens',    desc: 'Stock max +2',           costs: [6, 12],  maxLevel: 2 },
     { id: 'regenSpeed', label: 'Recharge rapide', desc: 'Recharge x1.7 plus vite', costs: [10],   maxLevel: 1 },
   ],

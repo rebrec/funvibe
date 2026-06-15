@@ -73,6 +73,32 @@ async function main() {
     await capture('preview/', 'sprites.png', 2200);
     await capture('editor/', 'editor.png');
 
+    // Vérifie le rechargement d'un niveau AVEC ennemis dans l'éditeur.
+    try {
+      const lvl = {
+        name: 'TestEnnemis', createdAt: Date.now(),
+        data: {
+          id: 't', world: { width: 2000, height: 1200 }, start: { x: 120, y: 1000 },
+          terrain: [{ type: 'ground', x: 0, y: 1050, width: 2000 }],
+          enemies: [
+            { x: 600, platformTop: 1050, minX: 400, maxX: 800, hp: 2, type: 'walker' },
+            { x: 1200, platformTop: 1050, minX: 1000, maxX: 1400, hp: 3, type: 'charger' },
+          ],
+          coins: [], crystals: [],
+        },
+      };
+      await page.goto(`http://localhost:${PORT}/editor/`, { waitUntil: 'load' });
+      await page.evaluate((l) => localStorage.setItem('customLevels', JSON.stringify([l])), lvl);
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForTimeout(500);
+      await page.click('.level-item');
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: resolve(outDir, 'editor-load.png') });
+      shots.push('editor-load.png');
+    } catch (e) {
+      console.warn('  ! capture editor-load ignorée :', e.message);
+    }
+
     // Best-effort : entrer dans le niveau (courir à droite vers le portail puis E).
     try {
       await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'load' });

@@ -55,6 +55,29 @@ function toWorld(cx, cy) { return { x: Math.round((cx - offsetX) / zoom), y: Mat
 function toCanvas(wx, wy) { return { x: wx * zoom + offsetX, y: wy * zoom + offsetY }; }
 function snapV(v) { return Math.round(v / snap) * snap; }
 
+// Recadre la vue (zoom + offset) pour englober tout le contenu chargé.
+function frameView() {
+  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+  const acc = (x, y) => { minx = Math.min(minx, x); miny = Math.min(miny, y); maxx = Math.max(maxx, x); maxy = Math.max(maxy, y); };
+  elements.forEach((el) => {
+    if (el.points) el.points.forEach((p) => acc(p.x, p.y));
+    else if (el.x1 != null) { acc(el.x1, el.y1); acc(el.x2, el.y2); }
+    else { acc(el.x, el.y); if (el.width) acc(el.x + el.width, el.y + 30); }
+  });
+  acc(levelStart.x, levelStart.y);
+  if (levelFinish) acc(levelFinish.x, levelFinish.y);
+  if (!Number.isFinite(minx)) { minx = 0; miny = 0; maxx = worldW; maxy = worldH; }
+  const pad = 140;
+  minx -= pad; miny -= pad; maxx += pad; maxy += pad;
+  const bw = Math.max(1, maxx - minx), bh = Math.max(1, maxy - miny);
+  const cw = canvas.width || canvas.offsetWidth, ch = canvas.height || canvas.offsetHeight;
+  zoom = Math.min(2, Math.max(0.05, Math.min(cw / bw, ch / bh)));
+  offsetX = -minx * zoom + (cw - bw * zoom) / 2;
+  offsetY = -miny * zoom + (ch - bh * zoom) / 2;
+  document.getElementById('zoom').value = Math.min(2, zoom);
+  document.getElementById('zoom-label').textContent = Math.round(zoom * 100) + '%';
+}
+
 // Applique un décalage (dx,dy) à un élément quel que soit son type.
 function applyDelta(el, dx, dy) {
   if (el.points) { el.points = el.points.map(p => ({ x: p.x + dx, y: p.y + dy })); }
@@ -459,12 +482,19 @@ function loadData(d, name) {
   for (const t of d.terrain ?? []) elements.push({ ...t });
   // NB : on étale d'abord puis on force "type" — sinon e.type ('walker') écraserait
   // le type éditeur ('enemy-walker') et l'ennemi devenait invisible au rechargement.
-  for (const e of d.enemies ?? []) elements.push({ ...e, type: e.type === 'charger' ? 'enemy-charger' : 'enemy-walker', behavior: e.type });
+  // On force aussi "y" (le JSON ne stocke que platformTop) sinon le rendu est à NaN.
+  for (const e of d.enemies ?? []) elements.push({
+    ...e,
+    type: e.type === 'charger' ? 'enemy-charger' : 'enemy-walker',
+    behavior: e.type,
+    y: e.y ?? e.platformTop,
+  });
   for (const c of d.coins   ?? []) elements.push({ ...c, type: 'coin' });
   for (const c of d.crystals?? []) elements.push({ ...c, type: 'crystal' });
   document.getElementById('world-w').value = worldW;
   document.getElementById('world-h').value = worldH;
   selectedIdx = -1; curveDraft = null;
+  frameView();   // recadre pour voir tout le niveau chargé (ennemis compris)
   refreshUI();
 }
 

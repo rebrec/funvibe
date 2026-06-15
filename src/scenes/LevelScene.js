@@ -331,11 +331,17 @@ export default class LevelScene extends Phaser.Scene {
 
       if (other.label === 'enemy') {
         const enemy = this.enemies.find((e) => e.body === other && e.alive);
-        if (enemy) enemy.takeHit(1);
+        // 1 shuriken = 1 cible : on consomme le projectile dès qu'il touche un
+        // ennemi VIVANT (kill() le passe en capteur, d'où le test AVANT takeHit).
+        if (enemy) {
+          enemy.takeHit(1);
+          this.destroyProjectile(pBody);
+        }
+        continue; // ennemi mort (capteur) => le shuriken passe au travers
       }
 
-      // Disparaît en touchant tout corps solide (ennemi vivant, plateforme, pente).
-      // Traverse les capteurs (pièces, ennemis morts, autres projectiles).
+      // Disparaît en touchant tout corps solide (plateforme, pente).
+      // Traverse les capteurs (pièces, autres projectiles).
       if (!other.isSensor) this.destroyProjectile(pBody);
     }
   }
@@ -436,11 +442,13 @@ export default class LevelScene extends Phaser.Scene {
     } else {
       this._camManualZoom = null;
       const aboveGround = Math.max(0, this._lastGroundY - this.player.y);
-      // Zone morte : un saut normal ne déclenche aucun zoom ; au-delà, transition très douce.
-      const t = Phaser.Math.Clamp((aboveGround - 450) / 1600, 0, 1);
+      // Dézoom progressif avec l'altitude : plus on enchaîne les sauts (haut), plus
+      // la vue s'élargit. Petite zone morte pour ne pas réagir aux micro-sauts.
+      const t = Phaser.Math.Clamp((aboveGround - 120) / 1600, 0, 1);
       targetZoom = Phaser.Math.Linear(this._camZoomDefault, this._camZoomWide, t);
     }
-    cam.setZoom(Phaser.Math.Linear(cam.zoom, targetZoom, 0.02));
+    // Lissage doux (pas d'à-coups), mais assez réactif pour suivre l'ascension.
+    cam.setZoom(Phaser.Math.Linear(cam.zoom, targetZoom, 0.045));
 
     // --- Ennemis & combat ---
     for (const e of this.enemies) e.update(delta);
