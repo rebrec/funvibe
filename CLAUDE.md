@@ -15,30 +15,32 @@ Au stade **maquette** : on valide gameplay / ressenti / mécaniques avec des **p
 ```bash
 nvm use          # bascule sur Node 22
 npm install
-npm run dev      # http://localhost:5173
-npm run build    # vérifie que tout compile (dist/)
+npm run dev      # http://localhost:5173  · /editor/ (éditeur) · /preview/ (aperçu sprites)
+npm run build    # vérifie que tout compile (dist/ multi-pages : main + editor + preview)
+npm test         # Vitest (fonctions pures : WorldLoader, Skins, curve)
+npm run report   # tests + build + captures Playwright → tests-output/<horodatage>/ (gitignoré)
 ```
 
-Je ne peux pas juger le **ressenti** (saut, vitesse, combat) à la place de l'utilisateur :
-après chaque changement de feel, je construis (`npm run build`) et je demande un test navigateur.
+Je ne peux pas juger le **ressenti** (saut, vitesse, combat, zoom) à la place de l'utilisateur :
+après chaque changement de feel, je construis (`npm run build`), je vérifie le rendu via
+`npm run report` (captures réelles), puis je demande un test navigateur.
 
 ## Public & ton
 Enfants 8 ans et +, doit aussi plaire aux ados/adultes. Univers façon *Ninja Legends*
 (personnages fins/agiles) — à concrétiser à la passe artistique.
 
-## Architecture (`src/`)
-- `main.js` — config Phaser (physique Matter, scènes), `scale: FIT`.
-- `core/Constants.js` — **TOUS les réglages** (gravité, vitesses, saut, combat, ennemis,
-  projectiles). C'est ici qu'on ajuste le feel.
-- `core/InputManager.js` — abstraction clavier→**actions** (move/jump/attack/ranged/interact).
-  **Ne jamais lire le clavier directement dans le gameplay** (pour brancher le tactile mobile plus tard).
-- `core/SaveManager.js` — persistance `localStorage` (pièces, cristaux).
-- `entities/Player.js` — déplacement, saut/double-saut, vie, attaques (melee + shuriken).
-- `entities/Enemy.js` — ennemis (`walker` patrouille+sauts, `charger` charge télégraphiée).
-- `entities/Projectile.js` — shuriken (capteur Matter).
-- `scenes/BootScene.js` — génère les textures placeholder + charge la sauvegarde.
-- `scenes/LevelScene.js` — niveau jouable (plateformes, pentes, collectibles, ennemis, combat, caméra).
-- `scenes/UIScene.js` — HUD superposé (pièces, cristaux, shurikens, cœurs).
+## Architecture
+- `src/main.js` — config Phaser (Matter, scènes : Boot/Hub/Level/UI/Shop/SkinDebug/CustomLevels), `scale: FIT`.
+- `src/core/Constants.js` — **TOUS les réglages** (gravité, vitesses, saut, combat, ennemis, projectiles, boutique).
+- `src/core/InputManager.js` — abstraction clavier→**actions**. **Ne jamais lire le clavier dans le gameplay** (tactile mobile plus tard).
+- `src/core/SaveManager.js` — persistance `localStorage` (pièces, cristaux, upgrades).
+- `src/core/Skins.js` — **textures/anims procédurales** : `generatePlayerTexture` = spritesheet articulée 16 frames (idle/course/saut/chute/atterrissage/rotation-boule/touché), `generateEnemyTexture` 2 frames ; thèmes + décors. Clé de texture paramétrable → brancher des **PNG** plus tard.
+- `src/data/levels/*.json` — **niveaux en données** (`level1.json` démo, `hub.json`). Types : ground/platform/wall/slope/curve/landmark + enemies/coins/crystals/start/finish/hubPortal/horizon/camera/world.
+- `src/world/WorldLoader.js` — `build(scene, data, theme)` instancie le niveau. `src/world/curve.js` — `smoothCurve()` (Catmull-Rom, pentes douces Sonic).
+- `src/entities/` — `Player.js` (déplacement, multi-saut + anims + pirouette), `Enemy.js` (walker/charger + anim), `Projectile.js` (shuriken), `WeaponVisual.js` (poing/arme).
+- `src/scenes/` — Boot (textures+anims+save), Hub (bouton ÉDITEUR, portail CUSTOM), Level (WorldLoader, finish, **zoom adaptatif**), UI (HUD + aide **hors zoom**), Shop, SkinDebug (F2), CustomLevels.
+- `editor/` — **éditeur de niveaux externe** (page Vite, Canvas, glisser-déposer) ; échange via `localStorage.customLevels`.
+- `preview/` — page d'aperçu des sprites/anims. `scripts/report.mjs` — captures Playwright. `tests/` — Vitest.
 
 ## Conventions importantes
 - **Mouvement kinématique** : on pilote la **vitesse** à la main (pas de forces), pour un feel précis.
@@ -51,11 +53,16 @@ Enfants 8 ans et +, doit aussi plaire aux ados/adultes. Univers façon *Ninja Le
   stock/recharge/cadence des shurikens, etc.
 
 ## État d'avancement
-- **M0** déplacement/saut/double-saut, pentes, verticalité, **grand niveau non-linéaire**, caméra anticipée — FAIT.
+- **M0** déplacement/saut/double-saut, pentes, verticalité, grand niveau, caméra anticipée — FAIT.
 - **M1** collecte pièces+cristaux, HUD, persistance localStorage — FAIT.
-- **M2** combat : ennemis (walker + charger), attaque melee + shuriken (stock régénératif), vie/cœurs,
-  dégâts + invincibilité + recul, réapparition — FAIT.
-- **Prochain : M3** hub-village jouable + boutique. Puis M4 portes & gating, M5 boss, M6 personnages & maîtrises.
+- **M2** combat : walker + charger, melee + shuriken (stock régénératif, 1 tir = 1 cible), cœurs,
+  invincibilité + recul, réapparition — FAIT.
+- **M3** hub-village jouable + boutique d'upgrades — FAIT.
+- **M4 (en cours)** refonte assets/architecture : skins/anims procéduraux articulés + rotation au saut ;
+  thèmes/décors ; **niveaux en JSON + WorldLoader** ; **pentes douces (curve) type Sonic** ;
+  **éditeur de niveaux externe** (`editor/`, localStorage) + niveaux custom jouables ;
+  **zoom caméra adaptatif** ; multi-sauts jusqu'à 15 (boutique) ; tests Vitest + captures Playwright.
+- **Prochain** : portes & gating, boss, personnages & maîtrises ; passe artistique (vrais PNG via le pipeline de skins).
 
 ## Commits
 Un commit par étape notable, message préfixé du jalon : `Mx: …`. L'utilisateur autorise les commits à ma discrétion.
