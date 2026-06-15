@@ -10,6 +10,7 @@ let currentTool = 'ground';
 let selectedIdx = -1;     // index dans elements[]
 let dragState = null;     // { phase, x0,y0,x1,y1 }
 let panState  = null;
+let moveState = null;     // déplacement (glisser-déposer) en mode Sélection
 let offsetX = 40, offsetY = 40;
 
 let levelName  = 'Nouveau niveau';
@@ -53,6 +54,20 @@ const TOOL_LABELS = {
 function toWorld(cx, cy) { return { x: Math.round((cx - offsetX) / zoom), y: Math.round((cy - offsetY) / zoom) }; }
 function toCanvas(wx, wy) { return { x: wx * zoom + offsetX, y: wy * zoom + offsetY }; }
 function snapV(v) { return Math.round(v / snap) * snap; }
+
+// Applique un décalage (dx,dy) à un élément quel que soit son type.
+function applyDelta(el, dx, dy) {
+  if (el.points) { el.points = el.points.map(p => ({ x: p.x + dx, y: p.y + dy })); }
+  else if (el.x1 != null) { el.x1 += dx; el.y1 += dy; el.x2 += dx; el.y2 += dy; }
+  else {
+    if (el.x != null) el.x += dx;
+    if (el.y != null) el.y += dy;
+    if (el.minX != null) el.minX += dx;
+    if (el.maxX != null) el.maxX += dx;
+    if (el.platformTop != null) el.platformTop += dy;
+  }
+  return el;
+}
 
 // ── Rendu ──────────────────────────────────────────────────────────────────
 function render() {
@@ -160,13 +175,19 @@ function drawElement(el, selected) {
     ctx.beginPath(); ctx.rect(c.x - w / 2, c.y - h / 2, w, h); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#fff'; ctx.font = `${Math.max(9, 11 * zoom)}px monospace`; ctx.textAlign = 'center';
     ctx.fillText(`HP:${el.hp}`, c.x, c.y + h / 2 + Math.max(10, 12 * zoom));
-    ctx.textAlign = 'start';
-    // Bornes de patrouille
+    // Zone de patrouille : ligne + bornes min/max marquées (◄ ►)
     if (el.minX != null && el.maxX != null) {
       const mn = toCanvas(el.minX, el.y), mx = toCanvas(el.maxX, el.y);
-      ctx.strokeStyle = col.stroke + '88'; ctx.beginPath();
-      ctx.moveTo(mn.x, mn.y); ctx.lineTo(mx.x, mx.y); ctx.stroke();
+      const yy = mn.y + h / 2 + 4;
+      ctx.strokeStyle = col.stroke; ctx.lineWidth = 2;
+      ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(mn.x, yy); ctx.lineTo(mx.x, yy); ctx.stroke(); ctx.setLineDash([]);
+      // bornes verticales
+      ctx.beginPath(); ctx.moveTo(mn.x, yy - 8); ctx.lineTo(mn.x, yy + 8);
+      ctx.moveTo(mx.x, yy - 8); ctx.lineTo(mx.x, yy + 8); ctx.stroke();
+      ctx.fillStyle = col.stroke; ctx.font = '11px monospace';
+      ctx.fillText('◄ min', mn.x, yy + 20); ctx.fillText('max ►', mx.x, yy + 20);
     }
+    ctx.textAlign = 'start';
     return;
   }
 
@@ -252,7 +273,18 @@ canvas.addEventListener('mousedown', e => {
   if (currentTool === 'curve') { (curveDraft ??= []).push({ x: sx, y: sy }); render(); return; }
   if (currentTool === 'start')  { levelStart = { x: sx, y: sy }; refreshUI(); return; }
   if (currentTool === 'finish') { levelFinish = { x: sx, y: sy }; refreshUI(); return; }
-  if (currentTool === 'select') { selectedIdx = hitTest(w.x, w.y); refreshUI(); return; }
+  if (currentTool === 'select') {
+    // Glisser-déposer : drapeaux d'abord, puis éléments.
+    if (levelFinish && Math.hypot(w.x - levelFinish.x, w.y - levelFinish.y) < 50) {
+      moveState = { kind: 'finish', sx0: w.x, sy0: w.y, orig: { ...levelFinish } }; return;
+    }
+    if (Math.hypot(w.x - levelStart.x, w.y - levelStart.y) < 50) {
+      moveState = { kind: 'start', sx0: w.x, sy0: w.y, orig: { ...levelStart } }; return;
+    }
+    selectedIdx = hitTest(w.x, w.y);
+    if (selectedIdx >= 0) moveState = { kind: 'el', sx0: w.x, sy0: w.y, orig: structuredClone(elements[selectedIdx]) };
+    refreshUI(); return;
+  }
 
   dragState = { phase: 'start', x0: sx, y0: sy, x1: sx, y1: sy };
 });
@@ -261,12 +293,20 @@ canvas.addEventListener('mousemove', e => {
   const w = toWorld(e.offsetX, e.offsetY);
   document.getElementById('status-pos').textContent = `x: ${w.x}  y: ${w.y}`;
   if (panState) { offsetX = panState.ox + (e.clientX - panState.startX); offsetY = panState.oy + (e.clientY - panState.startY); render(); return; }
+  if (moveState) {
+    const dx = snapV(w.x - moveState.sx0), dy = snapV(w.y - moveState.sy0);
+    if (moveState.kind === 'el') elements[selectedIdx] = applyDelta(structuredClone(moveState.orig), dx, dy);
+    else if (moveState.kind === 'start') levelStart = { x: moveState.orig.x + dx, y: moveState.orig.y + dy };
+    else if (moveState.kind === 'finish') levelFinish = { x: moveState.orig.x + dx, y: moveState.orig.y + dy };
+    render(); refreshJsonPreview(); return;
+  }
   if (dragState) { dragState.phase = 'drag'; dragState.x1 = snapV(w.x); dragState.y1 = snapV(w.y); render(); return; }
   if (curveDraft) render();
 });
 
 canvas.addEventListener('mouseup', e => {
   if (panState) { panState = null; return; }
+  if (moveState) { moveState = null; refreshUI(); return; }
   if (!dragState) return;
   const { x0, y0, x1, y1 } = dragState;
   dragState = null;
@@ -277,8 +317,9 @@ canvas.addEventListener('mouseup', e => {
     elements.push({ type: currentTool, x: x1, y: y1 });
   } else if (currentTool === 'enemy-walker' || currentTool === 'enemy-charger') {
     const behavior = currentTool === 'enemy-charger' ? 'charger' : 'walker';
-    const pw = x1 - x0;
-    elements.push({ type: currentTool, x: x0 + pw / 2, y: y0, platformTop: y0, minX: Math.min(x0, x1), maxX: Math.max(x0, x1), hp: 1, behavior });
+    let lo = Math.min(x0, x1), hi = Math.max(x0, x1);
+    if (hi - lo < 80) { lo = x0 - 150; hi = x0 + 150; } // zone par défaut si pas de glissé
+    elements.push({ type: currentTool, x: Math.round((lo + hi) / 2), y: y0, platformTop: y0, minX: lo, maxX: hi, hp: 1, behavior });
   } else if (currentTool === 'ground' || currentTool === 'platform' || currentTool === 'landmark') {
     const w = Math.abs(x1 - x0);
     if (w < snap) { render(); return; }
@@ -349,7 +390,7 @@ function refreshUI() { refreshInspector(); refreshLevelList(); refreshJsonPrevie
 function refreshInspector() {
   const cont = document.getElementById('inspector-content');
   if (selectedIdx < 0 || selectedIdx >= elements.length) {
-    cont.innerHTML = '<p class="hint">Sélectionnez un élément (outil Sélection)<br/>ou placez-en un.<br/><br/>Courbe : clique des points, Entrée/double-clic pour finir.</p>';
+    cont.innerHTML = '<p class="hint">Outil Sélection : <b>glisser</b> pour déplacer un élément (ou les drapeaux Début/Arrivée).<br/><br/>Courbe : clique des points, Entrée/double-clic pour finir.<br/><br/>Clic droit : supprimer.</p>';
     return;
   }
   const el = elements[selectedIdx];
@@ -416,9 +457,11 @@ function loadData(d, name) {
   levelFinish = d.finish ?? null;
   elements = [];
   for (const t of d.terrain ?? []) elements.push({ ...t });
-  for (const e of d.enemies ?? []) elements.push({ type: e.type === 'charger' ? 'enemy-charger' : 'enemy-walker', ...e });
-  for (const c of d.coins   ?? []) elements.push({ type: 'coin',    ...c });
-  for (const c of d.crystals?? []) elements.push({ type: 'crystal', ...c });
+  // NB : on étale d'abord puis on force "type" — sinon e.type ('walker') écraserait
+  // le type éditeur ('enemy-walker') et l'ennemi devenait invisible au rechargement.
+  for (const e of d.enemies ?? []) elements.push({ ...e, type: e.type === 'charger' ? 'enemy-charger' : 'enemy-walker', behavior: e.type });
+  for (const c of d.coins   ?? []) elements.push({ ...c, type: 'coin' });
+  for (const c of d.crystals?? []) elements.push({ ...c, type: 'crystal' });
   document.getElementById('world-w').value = worldW;
   document.getElementById('world-h').value = worldH;
   selectedIdx = -1; curveDraft = null;

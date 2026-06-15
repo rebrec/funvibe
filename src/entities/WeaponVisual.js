@@ -9,30 +9,37 @@ export function showAttack(scene, x, y, facing, type = 'fist') {
 }
 
 function _showFist(scene, x, y, facing) {
+  // Tout est dessiné vers la droite puis retourné via scaleX = facing.
   const g = scene.add.graphics().setDepth(6);
-  const ox = x + facing * 34; // point de départ du poing
-  const tx = x + facing * 52; // point d'arrivée
 
-  // Corps du poing (cercle chair)
-  g.fillStyle(0xf0c070, 1);
-  g.fillCircle(0, 0, 13);
-  // Jointures (3 petits cercles sur le dessus)
-  g.fillStyle(0xc08040, 1);
-  [-5, 0, 5].forEach(dx => g.fillCircle(dx, -11, 4));
-  // Contour knuckle (ligne d'ombre)
-  g.lineStyle(2, 0x8a5a20, 0.8);
-  g.strokeCircle(0, 0, 13);
+  // Lignes de mouvement (derrière le poing, vers le corps)
+  g.lineStyle(2, 0xffffff, 0.45);
+  for (let i = -1; i <= 1; i++) g.lineBetween(-26, i * 6, -8, i * 6);
 
-  g.setPosition(ox, y + 4);
+  // Avant-bras (manche) puis poignet
+  g.lineStyle(8, 0x2a2a4a, 1);
+  g.lineBetween(-24, 0, -6, 0);
+  g.lineStyle(7, 0xe0b080, 1); // peau
+  g.lineBetween(-10, 0, 2, 0);
 
+  // Poing (carré arrondi) + jointures dessinées de face
+  g.fillStyle(0xf0c890, 1);
+  g.fillRoundedRect(0, -8, 14, 16, 4);
+  g.fillStyle(0xc89868, 1);
+  for (let k = -1; k <= 1; k++) g.fillRect(11, -6 + (k + 1) * 5, 3, 3);
+  g.lineStyle(1.5, 0x8a5a20, 0.7);
+  g.strokeRoundedRect(0, -8, 14, 16, 4);
+
+  g.setPosition(x + facing * 16, y + 2);
+  g.setScale(facing, 1);
+
+  // Jab rapide : le poing s'avance puis disparaît (pas de "boule" qui grossit).
   scene.tweens.add({
     targets: g,
-    x: tx,
-    scaleX: 1.2,
-    scaleY: 0.85,
+    x: x + facing * 34,
     alpha: { from: 1, to: 0 },
-    duration: 150,
-    ease: 'Back.easeOut',
+    duration: 130,
+    ease: 'Quad.easeOut',
     onComplete: () => g.destroy(),
   });
 }

@@ -44,7 +44,9 @@ export default class UIScene extends Phaser.Scene {
       this.hearts.push(h);
     }
 
+    this._buildLevelUI();
     this.refresh();
+    this._refreshLevelUI();
 
     this.registry.events.on('changedata', this.onChange, this);
     this.events.once('shutdown', () => {
@@ -52,8 +54,48 @@ export default class UIScene extends Phaser.Scene {
     });
   }
 
+  // Éléments d'interface propres au niveau (aide, retour hub, bannière de fin,
+  // badge custom). Rendus ici → non affectés par le zoom de la caméra de jeu.
+  _buildLevelUI() {
+    this.levelHelp = this.add.text(16, GAME.HEIGHT - 52, [
+      'Flèches / A-D : se déplacer   ·   Espace / ↑ / W : sauter (double-saut)',
+      'J / X : frapper   ·   K / L : shuriken   ·   molette : zoom   ·   ramasse pièces & cristaux',
+    ], { fontFamily: 'monospace', fontSize: '15px', color: '#0a2233', lineSpacing: 4 }).setDepth(50);
+    this.levelHelp.setShadow(0, 1, '#ffffff', 0);
+
+    this.hubReturnHint = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT - 100, 'E : retourner au village', {
+      fontFamily: 'monospace', fontSize: '15px', color: '#ffffff',
+      backgroundColor: '#00000088', padding: { x: 10, y: 5 },
+    }).setOrigin(0.5).setDepth(50);
+
+    this.customBadge = this.add.text(GAME.WIDTH / 2, 30, '⚡ Niveau custom', {
+      fontFamily: 'monospace', fontSize: '14px', color: '#ffcc00',
+      backgroundColor: '#00000088', padding: { x: 8, y: 4 },
+    }).setOrigin(0.5).setDepth(50);
+
+    this.finishBanner = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2, 'NIVEAU TERMINÉ !', {
+      fontFamily: 'monospace', fontSize: '40px', color: '#ffe066', fontStyle: 'bold',
+      backgroundColor: '#000000aa', padding: { x: 20, y: 14 },
+    }).setOrigin(0.5).setDepth(60);
+  }
+
+  _refreshLevelUI() {
+    const inLevel = this.registry.get('inLevel') === true;
+    this.levelHelp.setVisible(inLevel);
+    this.customBadge.setVisible(inLevel && this.registry.get('isCustom') === true);
+    this.hubReturnHint.setVisible(inLevel && this.registry.get('nearHub') === true);
+    const done = inLevel && this.registry.get('levelComplete') === true;
+    if (done && !this.finishBanner.visible) {
+      this.finishBanner.setVisible(true).setScale(0.6);
+      this.tweens.add({ targets: this.finishBanner, scale: 1, duration: 300, ease: 'Back.easeOut' });
+    } else if (!done) {
+      this.finishBanner.setVisible(false);
+    }
+  }
+
   onChange(parent, key) {
     if (['coins', 'crystals', 'health', 'ammo', 'maxAmmo'].includes(key)) this.refresh();
+    if (['inLevel', 'isCustom', 'nearHub', 'levelComplete'].includes(key)) this._refreshLevelUI();
   }
 
   refresh() {

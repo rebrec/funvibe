@@ -103,18 +103,16 @@ export default class LevelScene extends Phaser.Scene {
     this.registry.set('maxAmmo', this.player.maxAmmo);
     this.registry.set('ammo', this.player.ammo);
 
-    this.createHelpOverlay();
     const portal = levelData.hubPortal ?? { x: 100, y: 1750, radius: 140 };
     this._buildHubPortal(portal);
     if (levelData.finish) this._buildFinish(levelData.finish);
 
-    // Informe si niveau custom chargé
-    if (this._customLevelIdx >= 0) {
-      this.add.text(W / 2, 30, '⚡ Niveau custom', {
-        fontFamily: 'monospace', fontSize: '14px', color: '#ffcc00',
-        backgroundColor: '#00000088', padding: { x: 8, y: 4 },
-      }).setScrollFactor(0).setDepth(200).setOrigin(0.5);
-    }
+    // État pour l'UI : le HUD/les indications vivent dans UIScene (caméra non zoomée)
+    // pour ne pas être déformés par le zoom de la caméra de jeu.
+    this.registry.set('inLevel', true);
+    this.registry.set('isCustom', this._customLevelIdx >= 0);
+    this.registry.set('nearHub', false);
+    this.registry.set('levelComplete', false);
 
     // HUD (scène parallèle) + ramassage des collectibles + impacts de projectiles.
     this.scene.launch('UIScene');
@@ -353,12 +351,6 @@ export default class LevelScene extends Phaser.Scene {
       fontFamily: 'monospace', fontSize: '15px', color: '#cc99ff', fontStyle: 'bold',
     }).setOrigin(0.5, 1);
     this.hubPortal = { x, y, radius };
-    this.hubHint = this.add
-      .text(GAME.WIDTH / 2, GAME.HEIGHT - 100, 'E : retourner au village', {
-        fontFamily: 'monospace', fontSize: '15px', color: '#ffffff',
-        backgroundColor: '#00000088', padding: { x: 10, y: 5 },
-      })
-      .setScrollFactor(0).setDepth(100).setOrigin(0.5).setVisible(false);
   }
 
   // Drapeau d'arrivée (zone de fin de niveau).
@@ -385,15 +377,18 @@ export default class LevelScene extends Phaser.Scene {
   _completeLevel() {
     if (this._finished) return;
     this._finished = true;
-    const t = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT / 2, 'NIVEAU TERMINÉ !', {
-      fontFamily: 'monospace', fontSize: '40px', color: '#ffe066', fontStyle: 'bold',
-      backgroundColor: '#000000aa', padding: { x: 20, y: 14 },
-    }).setScrollFactor(0).setDepth(300).setOrigin(0.5);
-    this.tweens.add({ targets: t, scale: { from: 0.6, to: 1 }, duration: 300, ease: 'Back.easeOut' });
+    this.registry.set('levelComplete', true); // bannière affichée par UIScene
     this.time.delayedCall(1800, () => this.goToHub());
   }
 
+  _resetUIFlags() {
+    this.registry.set('inLevel', false);
+    this.registry.set('nearHub', false);
+    this.registry.set('levelComplete', false);
+  }
+
   goToHub() {
+    this._resetUIFlags();
     this.scene.stop('UIScene');
     if (this.scene.isPaused('HubScene')) {
       // Venue normale depuis le hub (mis en pause) → on le réveille.
@@ -404,23 +399,6 @@ export default class LevelScene extends Phaser.Scene {
       // Venue d'un niveau custom (hub stoppé) → on le redémarre (relance l'UIScene).
       this.scene.start('HubScene');
     }
-  }
-
-  createHelpOverlay() {
-    const lines = [
-      'Flèches / A-D : se déplacer   ·   Espace / ↑ / W : sauter (double-saut)',
-      'J / X : frapper   ·   K / L : lancer un shuriken   ·   ramasse pièces & cristaux',
-    ];
-    const text = this.add
-      .text(16, GAME.HEIGHT - 52, lines, {
-        fontFamily: 'monospace',
-        fontSize: '15px',
-        color: '#0a2233',
-        lineSpacing: 4,
-      })
-      .setScrollFactor(0)
-      .setDepth(1000);
-    text.setShadow(0, 1, '#ffffff', 0);
   }
 
   update(time, delta) {
@@ -448,22 +426,21 @@ export default class LevelScene extends Phaser.Scene {
     }
     this.cameras.main.setFollowOffset(this.camLookaheadX, this.camLookaheadY);
 
-    // --- Zoom caméra ---
+    // --- Zoom caméra (doux, basé sur l'altitude au-dessus du dernier sol) ---
     const cam = this.cameras.main;
     if (this.player.isGrounded) this._lastGroundY = this.player.y;
     let targetZoom;
     if (this._camManualTimer > 0) {
-      // Survol manuel à la molette
-      this._camManualTimer -= delta;
+      this._camManualTimer -= delta;       // survol manuel à la molette
       targetZoom = this._camManualZoom;
     } else {
       this._camManualZoom = null;
-      // Dézoom si on monte/descend vite ou si on est haut au-dessus du dernier sol.
-      const aboveGround = this._lastGroundY - this.player.y;
-      const wide = Math.abs(vy) > 6 || aboveGround > 600;
-      targetZoom = wide ? this._camZoomWide : this._camZoomDefault;
+      const aboveGround = Math.max(0, this._lastGroundY - this.player.y);
+      // Zone morte : un saut normal ne déclenche aucun zoom ; au-delà, transition très douce.
+      const t = Phaser.Math.Clamp((aboveGround - 450) / 1600, 0, 1);
+      targetZoom = Phaser.Math.Linear(this._camZoomDefault, this._camZoomWide, t);
     }
-    cam.setZoom(Phaser.Math.Linear(cam.zoom, targetZoom, 0.05));
+    cam.setZoom(Phaser.Math.Linear(cam.zoom, targetZoom, 0.02));
 
     // --- Ennemis & combat ---
     for (const e of this.enemies) e.update(delta);
@@ -513,7 +490,7 @@ export default class LevelScene extends Phaser.Scene {
     const nearHub = Phaser.Math.Distance.Between(
       this.player.x, this.player.y, this.hubPortal.x, this.hubPortal.y
     ) < this.hubPortal.radius;
-    this.hubHint.setVisible(nearHub);
+    this.registry.set('nearHub', nearHub);
     if (nearHub && this.input_.isInteractJustPressed()) this.goToHub();
 
     // Arrivée : franchir la zone termine le niveau.

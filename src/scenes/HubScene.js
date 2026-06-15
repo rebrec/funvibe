@@ -44,6 +44,9 @@ export default class HubScene extends Phaser.Scene {
 
     this._buildEditorButton();
 
+    // L'UI propre au niveau ne doit pas s'afficher par-dessus le hub.
+    this.registry.set('inLevel', false);
+
     this.scene.launch('UIScene');
   }
 

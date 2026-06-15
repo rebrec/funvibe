@@ -73,6 +73,26 @@ async function main() {
     await capture('preview/', 'sprites.png', 2200);
     await capture('editor/', 'editor.png');
 
+    // Best-effort : entrer dans le niveau (courir à droite vers le portail puis E).
+    try {
+      await page.goto(`http://localhost:${PORT}/`, { waitUntil: 'load' });
+      await page.waitForTimeout(1200);
+      await page.click('canvas');
+      // Court jusqu'au portail NIVEAU (au-delà de la boutique) puis E sur place.
+      await page.keyboard.down('ArrowRight');
+      await page.waitForTimeout(2550);
+      await page.keyboard.up('ArrowRight');
+      await page.waitForTimeout(150);
+      for (let i = 0; i < 4; i++) { await page.keyboard.press('e'); await page.waitForTimeout(90); }
+      await page.waitForTimeout(1200);
+      await page.keyboard.press('j'); // un coup de poing pour la capture
+      await page.waitForTimeout(120);
+      await page.screenshot({ path: resolve(outDir, 'level.png') });
+      shots.push('level.png');
+    } catch (e) {
+      console.warn('  ! capture niveau ignorée :', e.message);
+    }
+
     await browser.close();
   } catch (e) {
     playwrightErr = e.message;
