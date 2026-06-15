@@ -3,12 +3,14 @@ import { GAME, PLAYER } from '../core/Constants.js';
 import { getTheme, buildHubDecor } from '../core/Skins.js';
 import InputManager from '../core/InputManager.js';
 import Player from '../entities/Player.js';
+import WorldLoader from '../world/WorldLoader.js';
+import hubData from '../data/levels/hub.json';
 
-const HUB_W = 1400;
-const HUB_H = 500;
-const GROUND_Y = 370;
-const START = { x: 200, y: GROUND_Y - PLAYER.HEIGHT / 2 };
-const PLAT_T = 28;
+const HUB_W    = hubData.world.width;
+const HUB_H    = hubData.world.height;
+const GROUND_Y = hubData.terrain[0].y; // y du sol principal
+const START    = hubData.start;
+const PLAT_T   = 28;
 
 export default class HubScene extends Phaser.Scene {
   constructor() {
@@ -27,6 +29,7 @@ export default class HubScene extends Phaser.Scene {
     this.doors = [];
 
     buildHubDecor(this, this.theme, HUB_W, GROUND_Y);
+    WorldLoader.build(this, hubData, this.theme);
     this.buildHub();
 
     this.player = new Player(this, START.x, START.y);
@@ -58,8 +61,7 @@ export default class HubScene extends Phaser.Scene {
   }
 
   buildHub() {
-    // Sol thématique
-    this.addGroundSection(0, GROUND_Y, HUB_W);
+    // Le sol est chargé via WorldLoader (hub.json). Les éléments interactifs / décoratifs suivent :
 
     // === Bâtiment BOUTIQUE ===
     const bx = 520, bw = 190, bh = 126;

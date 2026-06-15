@@ -6,20 +6,13 @@ import Player from '../entities/Player.js';
 import Enemy from '../entities/Enemy.js';
 import Projectile from '../entities/Projectile.js';
 import SaveManager from '../core/SaveManager.js';
+import WorldLoader from '../world/WorldLoader.js';
+import level1Data from '../data/levels/level1.json';
 
-// M0 — Sensations de plateforme sous Matter.js : niveau LONG (type Sonic/Donkey
-// Kong), avec verticalité, sections en hauteur et pentes (dans les deux sens).
-// Le tracé avance toujours vers la droite et ne se recoupe jamais (pas de pentes
-// qui se croisent par accident).
+const CUSTOM_LEVELS_KEY = 'customLevels';
 
-const WORLD_WIDTH = 12000;
-const WORLD_HEIGHT = 2200;
-
-const START = { x: 120, y: 1720 };
-const DEATH_Y = WORLD_HEIGHT - 20;
-
-// COL conservé pour la couleur landmark uniquement ; le reste utilise le thème.
-const COL_LANDMARK = 0xc06be0;
+const WORLD_WIDTH  = level1Data.world.width;
+const WORLD_HEIGHT = level1Data.world.height;
 
 const PLATFORM_THICKNESS = 28;
 const SLOPE_THICKNESS = 44;
@@ -37,12 +30,36 @@ export default class LevelScene extends Phaser.Scene {
     super('LevelScene');
   }
 
+  init(data) {
+    // Si un index customLevel est passé, on charge ce niveau depuis localStorage.
+    this._customLevelIdx = data?.customLevelIdx ?? -1;
+  }
+
+  _getLevelData() {
+    if (this._customLevelIdx >= 0) {
+      try {
+        const arr = JSON.parse(localStorage.getItem(CUSTOM_LEVELS_KEY) ?? '[]');
+        const entry = arr[this._customLevelIdx];
+        if (entry?.data) return entry.data;
+      } catch { /* ignore */ }
+    }
+    return level1Data;
+  }
+
   create() {
+    const levelData = this._getLevelData();
+
     this.theme = getTheme(this.registry.get('theme') ?? 'forest');
     this.keyF2 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F2);
 
-    this.matter.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT, 128, true, true, true, false);
-    this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    const W = levelData.world?.width  ?? WORLD_WIDTH;
+    const H = levelData.world?.height ?? WORLD_HEIGHT;
+    this._worldW = W;
+    this._worldH = H;
+    this._start  = levelData.start ?? START;
+    this._deathY = H - 20;
+    this.matter.world.setBounds(0, 0, W, H, 128, true, true, true, false);
+    this.cameras.main.setBounds(0, 0, W, H);
     this.cameras.main.setBackgroundColor(this.theme.background);
 
     this.input_ = new InputManager(this);
@@ -50,12 +67,10 @@ export default class LevelScene extends Phaser.Scene {
     this.enemies = [];
     this.projectiles = new Map(); // body Matter -> Projectile
 
-    buildLevelDecor(this, this.theme, WORLD_WIDTH, 1800);
-    this.buildLevel();
-    this.buildCollectibles();
-    this.buildEnemies();
+    buildLevelDecor(this, this.theme, W, H, 1800);
+    WorldLoader.build(this, levelData, this.theme);
 
-    this.player = new Player(this, START.x, START.y);
+    this.player = new Player(this, this._start.x, this._start.y);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
     this.cameras.main.setDeadzone(160, 180);
     this.camLookaheadX = 0;
@@ -68,7 +83,16 @@ export default class LevelScene extends Phaser.Scene {
     this.registry.set('ammo', this.player.ammo);
 
     this.createHelpOverlay();
-    this.buildHubPortal();
+    const portal = levelData.hubPortal ?? { x: 100, y: 1750, radius: 140 };
+    this._buildHubPortal(portal);
+
+    // Informe si niveau custom chargé
+    if (this._customLevelIdx >= 0) {
+      this.add.text(W / 2, 30, '⚡ Niveau custom', {
+        fontFamily: 'monospace', fontSize: '14px', color: '#ffcc00',
+        backgroundColor: '#00000088', padding: { x: 8, y: 4 },
+      }).setScrollFactor(0).setDepth(200).setOrigin(0.5);
+    }
 
     // HUD (scène parallèle) + ramassage des collectibles + impacts de projectiles.
     this.scene.launch('UIScene');
@@ -80,76 +104,10 @@ export default class LevelScene extends Phaser.Scene {
     });
   }
 
-  buildLevel() {
-    const P = this.theme.platColor;
-
-    // --- A. Départ + petite montée par plateformes ---
-    this.addGroundSection(0, 1800, 700);
-    this.addSlope(700, 1800, 1000, 1650);
-    this.addPlatform(1000, 1650, 200, P, true);
-    this.addPlatform(1300, 1650, 180, P, true);
-    this.addPlatform(1560, 1560, 160, P, true);
-    this.addPlatform(1800, 1470, 160, P, true);
-    this.addPlatform(2040, 1470, 200, P, true);
-    this.addSlope(2240, 1470, 2520, 1650);
-    this.addPlatform(2520, 1650, 260, P, true);
-
-    // --- B. Trou, puis pente raide et tour d'escalade ---
-    this.addPlatform(2960, 1700, 240, P, true);
-    this.addSlope(3200, 1700, 3380, 1450);
-    this.addPlatform(3380, 1450, 200, P, true);
-    this.addPlatform(3640, 1340, 150, P, true);
-    this.addPlatform(3880, 1230, 150, P, true);
-    this.addPlatform(3640, 1120, 150, P, true);
-    this.addPlatform(3880, 1010, 150, P, true);
-    this.addPlatform(3640, 900, 150, P, true);
-    this.addPlatform(3860, 790, 320, P, true);
-
-    // --- C. Longue section EN HAUTEUR, puis descente par pentes ---
-    this.addPlatform(4260, 790, 200, P, true);
-    this.addPlatform(4560, 850, 180, P, true);
-    this.addPlatform(4840, 790, 180, P, true);
-    this.addSlope(5100, 790, 5400, 1050);
-    this.addPlatform(5400, 1050, 300, P, true);
-    this.addPlatform(5760, 1150, 220, P, true);
-    this.addSlope(5980, 1150, 6300, 1400);
-    this.addPlatform(6300, 1400, 360, P, true);
-    this.addPlatform(6720, 1500, 260, P, true);
-
-    // --- D. Longue ligne au sol (section "vitesse") avec collines ---
-    this.addGroundSection(7040, 1600, 900);
-    this.addSlope(7940, 1600, 8300, 1450);
-    this.addPlatform(8300, 1450, 200, P, true);
-    this.addSlope(8540, 1450, 8900, 1650);
-    this.addGroundSection(8900, 1650, 400);
-
-    // --- E. Trou, dernière tour, et repère final ---
-    this.addPlatform(9420, 1650, 260, P, true);
-    this.addPlatform(9700, 1540, 150, P, true);
-    this.addPlatform(9940, 1430, 150, P, true);
-    this.addPlatform(9700, 1320, 150, P, true);
-    this.addPlatform(9940, 1210, 150, P, true);
-    this.addPlatform(9720, 1100, 300, P, true);
-    this.addPlatform(10120, 1100, 200, P, true);
-    this.addPlatform(10420, 1040, 180, P, true);
-    this.addPlatform(10700, 980, 180, P, true);
-    this.addPlatform(10980, 900, 240, COL_LANDMARK, true); // repère final
-    this.addGroundSection(11260, 1100, 500);
-
-    this.add
-      .text(11100, 850, 'ARRIVÉE', {
-        fontFamily: 'monospace',
-        fontSize: '22px',
-        color: '#3a1050',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5, 1);
-  }
-
   // Sol avec remplissage terreux (terrain "plein" visuellement).
   addGroundSection(x, topY, width) {
     // Remplissage terre (jusqu'au bas du monde)
-    const fillH = WORLD_HEIGHT - topY;
+    const fillH = (this._worldH ?? WORLD_HEIGHT) - topY;
     this.add.rectangle(
       x + width / 2, topY + fillH / 2, width, fillH, this.theme.groundBody
     ).setDepth(-3);
@@ -213,67 +171,6 @@ export default class LevelScene extends Phaser.Scene {
     vis.setRotation(angle);
   }
 
-  // --- Collectibles : pièces (jaunes) et cristaux (cyan) ---
-  // Disposés au-dessus du parcours. Corps capteur Matter (détection) + visuel
-  // séparé (animé librement, sans interférer avec la physique).
-  buildCollectibles() {
-    // --- Pièces POSÉES sur le sol (sur le chemin, faciles à ramasser) ---
-    this.groundCoinRow(220, 1800, 5, 60); // sol de départ
-    this.groundCoinRow(1020, 1650, 3, 60); // palier
-    this.groundCoinRow(2080, 1470, 2, 80);
-    this.groundCoinRow(2560, 1650, 3, 70);
-    this.groundCoin(3700, 1340); // paliers de la tour B
-    this.groundCoin(3940, 1230);
-    this.groundCoin(3700, 1120);
-    this.groundCoin(3940, 1010);
-    this.groundCoin(3700, 900);
-    this.groundCoinRow(3880, 790, 3, 80); // sommet de tour
-    this.groundCoin(4320, 790); // section haute C
-    this.groundCoin(4620, 850);
-    this.groundCoin(4920, 790);
-    this.groundCoinRow(5460, 1050, 2, 90);
-    this.groundCoin(6400, 1400);
-    this.groundCoinRow(7120, 1600, 9, 90); // longue ligne "vitesse"
-    this.groundCoinRow(8920, 1650, 4, 80);
-    this.groundCoin(9760, 1540); // tour E
-    this.groundCoin(10000, 1430);
-    this.groundCoin(9760, 1320);
-    this.groundCoin(10000, 1210);
-    this.groundCoinRow(11280, 1100, 4, 70); // après l'arrivée
-
-    // --- Pièces EN L'AIR (sur l'arc de saut, hauteurs conservatrices) ---
-    this.addCoin(2820, 1605); // arc au-dessus du 1er trou (le cristal occupe l'apex)
-    this.addCoin(2920, 1605);
-    this.addCoin(3760, 1255); // apex entre paliers de la tour B (~85 px au-dessus)
-    this.addCoin(3760, 1035);
-    this.addCoin(7500, 1515); // saut au-dessus de la ligne de vitesse (~85 px)
-    this.addCoin(7600, 1515);
-    this.addCoin(9340, 1605); // arc au-dessus du 2e trou
-    this.addCoin(9380, 1605);
-    this.addCoin(10300, 1015); // apex vers l'arrivée (~85 px au-dessus du palier)
-    this.addCoin(10580, 970);
-
-    // --- Cristaux : un mélange posé / en l'air ---
-    this.groundCrystal(4040, 790); // posé au sommet de la tour
-    this.addCrystal(4920, 720); // en l'air au-dessus de la section haute (~70 px, saut)
-    this.addCrystal(2870, 1560); // en l'air, sur l'arc du saut au-dessus du trou
-    this.groundCrystal(9870, 1100); // posé au sommet de la dernière tour
-    this.groundCrystal(11100, 900); // posé près de l'ARRIVÉE
-  }
-
-  // Pose un objet sur le dessus d'une plateforme (platformTop = Y de la surface).
-  groundCoin(x, platformTop) {
-    this.addCoin(x, platformTop - 12);
-  }
-
-  groundCoinRow(x, platformTop, count, step) {
-    for (let i = 0; i < count; i++) this.groundCoin(x + i * step, platformTop);
-  }
-
-  groundCrystal(x, platformTop) {
-    this.addCrystal(x, platformTop - 13);
-  }
-
   addCoin(x, y) {
     const body = this.matter.add.circle(x, y, 12, { isStatic: true, isSensor: true, label: 'coin' });
     const vis = this.add.circle(x, y, 11, this.theme.coinColor)
@@ -316,17 +213,6 @@ export default class LevelScene extends Phaser.Scene {
     }
   }
 
-  // --- Ennemis ---
-  buildEnemies() {
-    // Difficulté croissante : tués vite au début, de plus en plus coriaces ensuite.
-    this.addEnemy(460, 1800, 320, 600, { hp: 1 }); // début : meurt vite
-    this.addEnemy(3470, 1450, 3400, 3540, { hp: 2 });
-    this.addEnemy(6480, 1400, 6340, 6620, { hp: 3 });
-    this.addEnemy(7350, 1600, 7100, 7850, { hp: 3, behavior: 'charger' }); // fonceur coriace
-    this.addEnemy(9080, 1650, 8940, 9260, { hp: 4 }); // costaud avant la dernière tour
-    this.addEnemy(11400, 1100, 11280, 11700, { hp: 4 }); // costaud près de l'arrivée
-  }
-
   addEnemy(x, platformTop, minX, maxX, opts = {}) {
     const e = new Enemy(this, x, platformTop - ENEMY.HEIGHT / 2, { minX, maxX, ...opts });
     this.enemies.push(e);
@@ -341,7 +227,7 @@ export default class LevelScene extends Phaser.Scene {
   }
 
   respawnPlayer() {
-    this.player.respawn(START.x, START.y);
+    this.player.respawn(this._start.x, this._start.y);
     this.registry.set('health', this.player.health);
   }
 
@@ -388,8 +274,7 @@ export default class LevelScene extends Phaser.Scene {
     }
   }
 
-  buildHubPortal() {
-    const x = 100, y = 1750;
+  _buildHubPortal({ x, y, radius }) {
     const halo = this.add.circle(x, y, 44, 0x6633cc, 0.8);
     const core = this.add.circle(x, y, 32, 0x9966ff, 0.65);
     this.tweens.add({
@@ -399,7 +284,7 @@ export default class LevelScene extends Phaser.Scene {
     this.add.text(x, y - 54, 'VILLAGE', {
       fontFamily: 'monospace', fontSize: '15px', color: '#cc99ff', fontStyle: 'bold',
     }).setOrigin(0.5, 1);
-    this.hubPortal = { x, y, radius: 140 };
+    this.hubPortal = { x, y, radius };
     this.hubHint = this.add
       .text(GAME.WIDTH / 2, GAME.HEIGHT - 100, 'E : retourner au village', {
         fontFamily: 'monospace', fontSize: '15px', color: '#ffffff',
@@ -509,10 +394,10 @@ export default class LevelScene extends Phaser.Scene {
     if (nearHub && this.input_.isInteractJustPressed()) this.goToHub();
 
     // Chute dans le vide : on réapparaît au départ (sans perdre de vie).
-    if (this.player.y > DEATH_Y) {
+    if (this.player.y > this._deathY) {
       this.player.setVelocity(0, 0);
       this.player.isGrounded = false;
-      this.player.setPosition(START.x, START.y);
+      this.player.setPosition(this._start.x, this._start.y);
     }
   }
 }

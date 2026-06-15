@@ -11,6 +11,8 @@ export const GAME = {
 
 export const PHYSICS = {
   GRAVITY_Y: 1.3, // gravité du monde Matter (1 = défaut ; >1 = chute moins flottante)
+  CATEGORY_SOLID:  0x0001, // sol, murs, obstacles infranchissables
+  CATEGORY_ONEWAY: 0x0002, // plateformes traversables par le bas, bloquantes par le dessus
 };
 
 export const PLAYER = {

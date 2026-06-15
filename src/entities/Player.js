@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { PLAYER } from '../core/Constants.js';
+import { PLAYER, PHYSICS } from '../core/Constants.js';
+import { showAttack } from './WeaponVisual.js';
 
 const MatterLib = Phaser.Physics.Matter.Matter;
 
@@ -28,6 +29,10 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
       frictionAir: 0,
       restitution: 0,
       label: 'player',
+      collisionFilter: {
+        category: PHYSICS.CATEGORY_SOLID,
+        mask: PHYSICS.CATEGORY_SOLID | PHYSICS.CATEGORY_ONEWAY,
+      },
     });
     this.setExistingBody(body);
     this.setFixedRotation();
@@ -51,6 +56,7 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
     this.attackCooldown = 0;
     this.attackId = 0; // incrémenté à chaque frappe (1 touche max par ennemi/frappe)
     this.rangedCooldown = 0; // ms avant de pouvoir relancer un projectile
+    this.weaponType = 'fist'; // 'fist' | 'katana' | 'spear' — évolutif via boutique
     this.maxAmmo = reg.get('maxAmmo') ?? PLAYER.RANGED_MAX_AMMO;
     this.ammo = this.maxAmmo;
     this.regenTimer = PLAYER.RANGED_REGEN * this.regenMultiplier;
@@ -109,6 +115,13 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
 
   update(delta, input) {
     const body = this.body;
+
+    // Plateformes one-way : on passe au travers en montant, on atterrit en descendant.
+    const wantMask = body.velocity.y < -0.5
+      ? PHYSICS.CATEGORY_SOLID
+      : (PHYSICS.CATEGORY_SOLID | PHYSICS.CATEGORY_ONEWAY);
+    if (body.collisionFilter.mask !== wantMask) body.collisionFilter.mask = wantMask;
+
     const grounded = this.isGrounded;
 
     const axis = input.getMoveAxis();
@@ -191,6 +204,16 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
         this.jumpsRemaining -= 1;
         this.jumpBufferTimer = 0;
         this.isJumping = true;
+        // Pirouette (boule) sur chaque saut aérien
+        this.scene.tweens.killTweensOf(this);
+        this.scene.tweens.add({
+          targets: this,
+          angle: { from: 0, to: 360 },
+          scaleX: 0.65, scaleY: 0.65,
+          duration: 260, ease: 'Cubic.easeIn',
+          yoyo: true,
+          onComplete: () => { this.setAngle(0); this.setScale(1); },
+        });
       }
     }
 
@@ -235,19 +258,7 @@ export default class Player extends Phaser.Physics.Matter.Sprite {
     this.attackTimer = PLAYER.ATTACK_DURATION;
     this.attackCooldown = PLAYER.ATTACK_COOLDOWN;
     this.attackId += 1;
-
-    // Éclair de frappe (visuel placeholder).
-    const hb = this.getAttackHitbox();
-    const slash = this.scene.add
-      .rectangle(hb.x, hb.y, hb.w, hb.h, 0xffffff, 0.55)
-      .setStrokeStyle(2, 0xffe08a)
-      .setDepth(5);
-    this.scene.tweens.add({
-      targets: slash,
-      alpha: 0,
-      duration: PLAYER.ATTACK_DURATION,
-      onComplete: () => slash.destroy(),
-    });
+    showAttack(this.scene, this.x, this.y, this.facing, this.weaponType);
   }
 
   // Reçoit un coup venant de fromX. Renvoie true si le coup a porté.

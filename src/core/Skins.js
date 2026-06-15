@@ -391,10 +391,18 @@ export function generateShurikenTexture(scene) {
 // ──────────────────────────────────────────────────────────────
 
 // Dessine les décors de fond pour un niveau (monde large).
-// worldW / groundY = largeur et hauteur du sol dans ce monde.
-export function buildLevelDecor(scene, theme, worldW, groundY) {
-  const g = scene.add.graphics();
-  g.setDepth(-10);
+// worldH est nécessaire pour le remplissage terreux global.
+export function buildLevelDecor(scene, theme, worldW, worldH, groundY) {
+  // ── Couche de fond (depth -5) : remplissage terreux global sous la ligne d'horizon
+  const gBase = scene.add.graphics().setDepth(-5);
+  gBase.fillStyle(theme.groundBody, 1);
+  gBase.fillRect(0, groundY, worldW, worldH - groundY);
+  // Bande de surface sur toute la largeur
+  gBase.fillStyle(theme.groundTop, 1);
+  gBase.fillRect(0, groundY, worldW, 12);
+
+  // ── Couche décors (depth -10) : éléments thématiques
+  const g = scene.add.graphics().setDepth(-10);
   const fn = theme.decorFn;
   if (fn === 'forest') _forestDecor(g, worldW, groundY);
   else if (fn === 'snow') _snowDecor(g, worldW, groundY);

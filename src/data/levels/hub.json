@@ -1,0 +1,8 @@
+{
+  "id": "hub",
+  "world": { "width": 1400, "height": 500 },
+  "start": { "x": 200, "y": 322 },
+  "terrain": [
+    { "type": "ground", "x": 0, "y": 370, "width": 1400 }
+  ]
+}

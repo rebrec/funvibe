@@ -162,8 +162,7 @@ export default class SkinDebugScene extends Phaser.Scene {
     // Arrête la scène appelante (UIScene + caller) puis redémarre le hub
     this.scene.stop('UIScene');
     this.scene.stop(this.callerScene);
-    this.scene.stop();
-    this.scene.start('HubScene');
+    this.scene.start('HubScene'); // stoppe SkinDebugScene implicitement
   }
 
   _close() {
