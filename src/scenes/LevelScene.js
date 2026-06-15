@@ -7,7 +7,7 @@ import Enemy from '../entities/Enemy.js';
 import Projectile from '../entities/Projectile.js';
 import SaveManager from '../core/SaveManager.js';
 import WorldLoader from '../world/WorldLoader.js';
-import { smoothCurve } from '../world/curve.js';
+import { smoothCurve, smoothClosedCurve } from '../world/curve.js';
 import level1Data from '../data/levels/level1.json';
 
 const CUSTOM_LEVELS_KEY = 'customLevels';
@@ -231,8 +231,52 @@ export default class LevelScene extends Phaser.Scene {
       const ndy = Math.cos(angle);
       const cx = (a.x + b.x) / 2 + (SLOPE_THICKNESS / 2) * ndx;
       const cy = (a.y + b.y) / 2 + (SLOPE_THICKNESS / 2) * ndy;
-      this.matter.add.rectangle(cx, cy, len + 2, SLOPE_THICKNESS, {
+      // PAS de débord (len exact) : un +overlap faisait dépasser le coin haut du
+      // segment de bout au-dessus de la surface voisine → "mur invisible" aux jonctions.
+      this.matter.add.rectangle(cx, cy, len, SLOPE_THICKNESS, {
         isStatic: true, friction: 0, angle, label: 'slope',
+      });
+    }
+  }
+
+  // Île suspendue : forme arrondie FERMÉE, remplie à l'intérieur, solide tout autour.
+  // Le contour lissé sert au visuel (remplissage intérieur + liseré d'herbe) et à
+  // la physique (chaîne de segments décalés vers l'intérieur → coque solide).
+  addIsland(points) {
+    if (!points || points.length < 3) return;
+    const outline = smoothClosedCurve(points, 8);
+
+    // Centroïde (pour orienter les normales vers l'intérieur).
+    let cxs = 0, cys = 0;
+    for (const p of outline) { cxs += p.x; cys += p.y; }
+    cxs /= outline.length; cys /= outline.length;
+
+    // Visuel : remplissage intérieur + liseré d'herbe sur tout le contour.
+    const g = this.add.graphics().setDepth(-3);
+    g.fillStyle(this.theme.groundBody, 1);
+    g.beginPath();
+    g.moveTo(outline[0].x, outline[0].y);
+    for (let i = 1; i < outline.length; i++) g.lineTo(outline[i].x, outline[i].y);
+    g.closePath(); g.fillPath();
+    g.lineStyle(8, this.theme.groundTop, 1);
+    g.beginPath();
+    g.moveTo(outline[0].x, outline[0].y);
+    for (let i = 1; i < outline.length; i++) g.lineTo(outline[i].x, outline[i].y);
+    g.closePath(); g.strokePath();
+
+    // Physique : coque de segments décalés vers l'intérieur.
+    const TH = SLOPE_THICKNESS;
+    for (let i = 0; i < outline.length - 1; i++) {
+      const a = outline[i], b = outline[i + 1];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const len = Math.hypot(dx, dy);
+      if (len < 1) continue;
+      const angle = Math.atan2(dy, dx);
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      let nx = -dy / len, ny = dx / len;             // normale au segment
+      if ((cxs - mx) * nx + (cys - my) * ny < 0) { nx = -nx; ny = -ny; } // vers l'intérieur
+      this.matter.add.rectangle(mx + (TH / 2) * nx, my + (TH / 2) * ny, len, TH, {
+        isStatic: true, friction: 0, angle, label: 'platform',
       });
     }
   }

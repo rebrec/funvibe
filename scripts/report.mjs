@@ -79,7 +79,11 @@ async function main() {
         name: 'TestEnnemis', createdAt: Date.now(),
         data: {
           id: 't', world: { width: 2000, height: 1200 }, start: { x: 120, y: 1000 },
-          terrain: [{ type: 'ground', x: 0, y: 1050, width: 2000 }],
+          terrain: [
+            { type: 'ground', x: 0, y: 1050, width: 2000 },
+            { type: 'curve', points: [{ x: 200, y: 1050 }, { x: 400, y: 920 }, { x: 650, y: 900 }, { x: 850, y: 1040 }, { x: 1000, y: 1050 }] },
+            { type: 'island', points: [{ x: 1300, y: 800 }, { x: 1400, y: 720 }, { x: 1560, y: 720 }, { x: 1640, y: 810 }, { x: 1520, y: 880 }, { x: 1360, y: 875 }] },
+          ],
           enemies: [
             { x: 600, platformTop: 1050, minX: 400, maxX: 800, hp: 2, type: 'walker' },
             { x: 1200, platformTop: 1050, minX: 1000, maxX: 1400, hp: 3, type: 'charger' },

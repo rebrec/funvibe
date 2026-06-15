@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { smoothCurve } from '../src/world/curve.js';
+import { smoothCurve, smoothClosedCurve } from '../src/world/curve.js';
 
 describe('smoothCurve', () => {
   const pts = [{ x: 0, y: 0 }, { x: 100, y: -50 }, { x: 200, y: 0 }];
@@ -31,5 +31,27 @@ describe('smoothCurve', () => {
     const out = smoothCurve(pts, 8);
     const mid = out[Math.floor(out.length / 2)];
     expect(mid.y).toBeLessThan(0);
+  });
+});
+
+describe('smoothClosedCurve (île fermée)', () => {
+  const loop = [{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 }];
+
+  it('produit N*segPerSpan + 1 points et referme la boucle', () => {
+    const out = smoothClosedCurve(loop, 8);
+    expect(out).toHaveLength(loop.length * 8 + 1);
+    expect(out[0]).toEqual(out[out.length - 1]); // dernier = premier
+  });
+
+  it('retombe sur smoothCurve si moins de 3 points', () => {
+    expect(smoothClosedCurve([{ x: 0, y: 0 }, { x: 1, y: 1 }], 4))
+      .toEqual(smoothCurve([{ x: 0, y: 0 }, { x: 1, y: 1 }], 4));
+  });
+
+  it('coordonnées finies', () => {
+    for (const p of smoothClosedCurve(loop, 8)) {
+      expect(Number.isFinite(p.x)).toBe(true);
+      expect(Number.isFinite(p.y)).toBe(true);
+    }
   });
 });

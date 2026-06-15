@@ -1,6 +1,8 @@
 // Éditeur de niveaux jeuleo — vanilla JS + Canvas 2D.
 // Communication jeu ↔ éditeur via localStorage (clé "customLevels").
 
+import { smoothClosedCurve } from '../src/world/curve.js';
+
 const STORAGE_KEY = 'customLevels';
 
 // ── État global ────────────────────────────────────────────────────────────
@@ -11,6 +13,7 @@ let selectedIdx = -1;     // index dans elements[]
 let dragState = null;     // { phase, x0,y0,x1,y1 }
 let panState  = null;
 let moveState = null;     // déplacement (glisser-déposer) en mode Sélection
+let curveKind = 'curve';  // 'curve' (pente ouverte) ou 'island' (boucle fermée)
 let offsetX = 40, offsetY = 40;
 
 let levelName  = 'Nouveau niveau';
@@ -36,6 +39,7 @@ const COLORS = {
   platform:       { fill: '#6655bb', stroke: '#9977ff' },
   slope:          { fill: '#887744', stroke: '#ccaa66' },
   curve:          { fill: '#3a8a4a', stroke: '#7fe08f' },
+  island:         { fill: '#3a7a55', stroke: '#7fe0a8' },
   landmark:       { fill: '#9944bb', stroke: '#dd88ff' },
   'enemy-walker': { fill: '#cc4444', stroke: '#ff8888' },
   'enemy-charger':{ fill: '#993311', stroke: '#ff6633' },
@@ -45,7 +49,7 @@ const COLORS = {
 
 const TOOL_LABELS = {
   ground: 'Sol', platform: 'Plateforme', slope: 'Pente droite', curve: 'Pente douce',
-  landmark: 'Repère', start: 'Début', finish: 'Arrivée',
+  island: 'Île suspendue', landmark: 'Repère', start: 'Début', finish: 'Arrivée',
   'enemy-walker': 'Ennemi walker', 'enemy-charger': 'Ennemi charger',
   coin: 'Pièce', crystal: 'Cristal', select: 'Sélection',
 };
@@ -147,6 +151,18 @@ function drawElement(el, selected) {
   ctx.fillStyle   = col.fill + (selected ? 'dd' : '99');
   ctx.strokeStyle = selected ? '#ffffff' : col.stroke;
   ctx.lineWidth   = selected ? 2 : 1;
+
+  if (el.type === 'island') {
+    const pts = smoothClosedCurve(el.points, 8);
+    ctx.beginPath();
+    const c0 = toCanvas(pts[0].x, pts[0].y); ctx.moveTo(c0.x, c0.y);
+    for (let i = 1; i < pts.length; i++) { const c = toCanvas(pts[i].x, pts[i].y); ctx.lineTo(c.x, c.y); }
+    ctx.closePath(); ctx.fill();
+    ctx.lineWidth = selected ? 4 : 3; ctx.strokeStyle = selected ? '#ffffff' : col.stroke; ctx.stroke();
+    ctx.fillStyle = col.stroke;
+    el.points.forEach(p => { const c = toCanvas(p.x, p.y); ctx.beginPath(); ctx.arc(c.x, c.y, 3, 0, Math.PI * 2); ctx.fill(); });
+    return;
+  }
 
   if (el.type === 'curve') {
     // Remplissage jusqu'au bas du monde + crête lissée
@@ -251,10 +267,19 @@ function drawCheckered(pos) {
 function drawCurveDraft() {
   const pts = curveDraft;
   if (!pts.length) return;
-  ctx.strokeStyle = COLORS.curve.stroke; ctx.lineWidth = 2; ctx.setLineDash([5, 3]);
-  ctx.beginPath(); smoothPath(pts.length >= 2 ? pts : [pts[0], pts[0]]); ctx.stroke(); ctx.setLineDash([]);
+  const col = COLORS[curveKind] ?? COLORS.curve;
+  ctx.strokeStyle = col.stroke; ctx.lineWidth = 2; ctx.setLineDash([5, 3]);
+  if (curveKind === 'island' && pts.length >= 3) {
+    const sp = smoothClosedCurve(pts, 8);
+    ctx.beginPath(); const c0 = toCanvas(sp[0].x, sp[0].y); ctx.moveTo(c0.x, c0.y);
+    for (let i = 1; i < sp.length; i++) { const c = toCanvas(sp[i].x, sp[i].y); ctx.lineTo(c.x, c.y); }
+    ctx.closePath(); ctx.stroke();
+  } else {
+    ctx.beginPath(); smoothPath(pts.length >= 2 ? pts : [pts[0], pts[0]]); ctx.stroke();
+  }
+  ctx.setLineDash([]);
   ctx.fillStyle = '#fff';
-  pts.forEach(p => { const c = toCanvas(p.x, p.y); ctx.beginPath(); ctx.arc(c.x, c.y, 4, 0, Math.PI*2); ctx.fill(); });
+  pts.forEach(p => { const c = toCanvas(p.x, p.y); ctx.beginPath(); ctx.arc(c.x, c.y, 4, 0, Math.PI * 2); ctx.fill(); });
 }
 
 function drawDragPreview() {
@@ -293,7 +318,9 @@ canvas.addEventListener('mousedown', e => {
   const w = toWorld(e.offsetX, e.offsetY);
   const sx = snapV(w.x), sy = snapV(w.y);
 
-  if (currentTool === 'curve') { (curveDraft ??= []).push({ x: sx, y: sy }); render(); return; }
+  if (currentTool === 'curve' || currentTool === 'island') {
+    curveKind = currentTool; (curveDraft ??= []).push({ x: sx, y: sy }); render(); return;
+  }
   if (currentTool === 'start')  { levelStart = { x: sx, y: sy }; refreshUI(); return; }
   if (currentTool === 'finish') { levelFinish = { x: sx, y: sy }; refreshUI(); return; }
   if (currentTool === 'select') {
@@ -362,8 +389,9 @@ window.addEventListener('keydown', e => {
 });
 
 function finalizeCurve() {
-  if (curveDraft && curveDraft.length >= 2) {
-    elements.push({ type: 'curve', points: curveDraft });
+  const min = curveKind === 'island' ? 3 : 2;
+  if (curveDraft && curveDraft.length >= min) {
+    elements.push({ type: curveKind, points: curveDraft });
     selectedIdx = elements.length - 1;
   }
   curveDraft = null;
@@ -387,10 +415,24 @@ function distToSeg(px, py, ax, ay, bx, by) {
   let t = ((px - ax) * dx + (py - ay) * dy) / len2; t = Math.max(0, Math.min(1, t));
   return Math.hypot(ax + t*dx - px, ay + t*dy - py);
 }
+function pointInPoly(px, py, pts) {
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i].x, yi = pts[i].y, xj = pts[j].x, yj = pts[j].y;
+    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
 function hitTest(wx, wy) {
   for (let i = elements.length - 1; i >= 0; i--) {
     const el = elements[i];
-    if (el.type === 'curve') {
+    if (el.type === 'island') {
+      if (pointInPoly(wx, wy, el.points)) return i;
+      for (let k = 0; k < el.points.length; k++) {
+        const a = el.points[k], b = el.points[(k + 1) % el.points.length];
+        if (distToSeg(wx, wy, a.x, a.y, b.x, b.y) < 16) return i;
+      }
+    } else if (el.type === 'curve') {
       for (let k = 0; k < el.points.length - 1; k++) {
         if (distToSeg(wx, wy, el.points[k].x, el.points[k].y, el.points[k+1].x, el.points[k+1].y) < 16) return i;
       }
@@ -417,11 +459,13 @@ function refreshInspector() {
     return;
   }
   const el = elements[selectedIdx];
-  if (el.type === 'curve') {
-    cont.innerHTML = `<p class="hint">Pente douce — ${el.points.length} points.</p>
+  if (el.type === 'curve' || el.type === 'island') {
+    const min = el.type === 'island' ? 3 : 2;
+    const nom = el.type === 'island' ? 'Île suspendue' : 'Pente douce';
+    cont.innerHTML = `<p class="hint">${nom} — ${el.points.length} points.</p>
       <button id="del-last-pt" class="action-btn">Supprimer dernier point</button>`;
     document.getElementById('del-last-pt').addEventListener('click', () => {
-      if (el.points.length > 2) { el.points.pop(); refreshUI(); }
+      if (el.points.length > min) { el.points.pop(); refreshUI(); }
       else { elements.splice(selectedIdx, 1); selectedIdx = -1; refreshUI(); }
     });
     return;
@@ -505,7 +549,7 @@ function loadCustomLevel(idx) {
 
 // ── Sérialisation ──────────────────────────────────────────────────────────
 function buildLevelData() {
-  const terrainTypes = ['ground', 'platform', 'slope', 'curve', 'landmark', 'wall'];
+  const terrainTypes = ['ground', 'platform', 'slope', 'curve', 'island', 'landmark', 'wall'];
   const terrain = elements.filter(e => terrainTypes.includes(e.type));
   const enemies = elements.filter(e => e.type === 'enemy-walker' || e.type === 'enemy-charger').map(e => ({
     x: e.x, platformTop: e.platformTop ?? e.y, minX: e.minX, maxX: e.maxX,
@@ -583,7 +627,7 @@ document.querySelectorAll('.tool-btn').forEach(btn => {
     document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentTool = btn.dataset.tool;
-    if (currentTool !== 'curve') { curveDraft = null; }
+    if (currentTool !== 'curve' && currentTool !== 'island') { curveDraft = null; }
     document.getElementById('status-tool').textContent = 'Outil : ' + (TOOL_LABELS[currentTool] ?? currentTool);
     canvas.style.cursor = currentTool === 'select' ? 'default' : 'crosshair';
     render();

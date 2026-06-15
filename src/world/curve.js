@@ -30,3 +30,23 @@ export function smoothCurve(points, segPerSpan = 8) {
   out.push({ x: pts[n - 1].x, y: pts[n - 1].y });
   return out;
 }
+
+// Boucle fermée lissée (île suspendue) : la courbe se referme sur elle-même.
+// Pour N points de contrôle : N*segPerSpan + 1 points (le dernier = le premier).
+export function smoothClosedCurve(points, segPerSpan = 8) {
+  const n = points?.length ?? 0;
+  if (n < 3) return smoothCurve(points, segPerSpan);
+  const pts = points.map((p) => ({ x: p.x, y: p.y }));
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const p0 = pts[(i - 1 + n) % n];
+    const p1 = pts[i];
+    const p2 = pts[(i + 1) % n];
+    const p3 = pts[(i + 2) % n];
+    for (let s = 0; s < segPerSpan; s++) {
+      out.push(_catmull(p0, p1, p2, p3, s / segPerSpan));
+    }
+  }
+  out.push({ x: out[0].x, y: out[0].y }); // referme la boucle
+  return out;
+}
