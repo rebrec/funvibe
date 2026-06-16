@@ -22,6 +22,9 @@ let levelStart  = { x: 120, y: 1900 };
 let levelFinish = null;
 let elements    = []; // { type, ... } pour terrain + entités
 let curveDraft  = null; // points de la courbe en cours de tracé
+let showReference = false;
+let referencePos = { x: 500, y: 1500 }; // position du repère joueur
+let draggingReference = false;
 
 // ── Canvas ───────────────────────────────────────────────────────────────
 const canvas = document.getElementById('canvas');
@@ -130,6 +133,7 @@ function render() {
 
   if (dragState && dragState.phase === 'drag') drawDragPreview();
   if (curveDraft) drawCurveDraft();
+  if (showReference) drawReference();
 }
 
 function smoothPath(pts) {
@@ -300,6 +304,32 @@ function drawDragPreview() {
   ctx.setLineDash([]);
 }
 
+function drawReference() {
+  // Affiche un repère de joueur + distances de saut, draggable.
+  const c = toCanvas(referencePos.x, referencePos.y);
+  const playerW = 22 * zoom, playerH = 36 * zoom; // taille du joueur
+
+  // Silhouette joueur
+  ctx.fillStyle = '#ff9933aa'; ctx.strokeStyle = '#ffcc66';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.rect(c.x - playerW/2, c.y - playerH/2, playerW, playerH);
+  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#ffcc66'; ctx.font = `bold ${Math.max(8, 9*zoom)}px monospace`;
+  ctx.textAlign = 'center'; ctx.fillText('J', c.x, c.y + playerH/2 + 8);
+
+  // Arcs de saut : 1 saut ≈ 280px, 2 sauts ≈ 400px (approx from constants)
+  const jump1Dist = 280, jump2Dist = 420, jump3Dist = 540;
+  ctx.strokeStyle = '#ffff6666'; ctx.lineWidth = 1; ctx.setLineDash([3, 2]);
+
+  [jump1Dist, jump2Dist, jump3Dist].forEach((dist, i) => {
+    const rad = dist * zoom;
+    ctx.beginPath(); ctx.arc(c.x, c.y, rad, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.font = `${Math.max(8, 9*zoom)}px monospace`;
+    ctx.textAlign = 'left'; ctx.fillText(`${i+1}s`, c.x + rad + 4, c.y - 4);
+  });
+  ctx.setLineDash([]);
+}
+
 // ── Souris ───────────────────────────────────────────────────────────────
 canvas.addEventListener('contextmenu', e => {
   e.preventDefault();
@@ -319,10 +349,21 @@ canvas.addEventListener('mousedown', e => {
   const sx = snapV(w.x), sy = snapV(w.y);
 
   if (currentTool === 'curve' || currentTool === 'island') {
-    curveKind = currentTool; (curveDraft ??= []).push({ x: sx, y: sy }); render(); return;
+    // e.detail === 2 = deuxième clic du double-clic (finalization, ne pas ajouter de point)
+    if (e.detail < 2) {
+      curveKind = currentTool; (curveDraft ??= []).push({ x: sx, y: sy }); render();
+    }
+    return;
   }
   if (currentTool === 'start')  { levelStart = { x: sx, y: sy }; refreshUI(); return; }
   if (currentTool === 'finish') { levelFinish = { x: sx, y: sy }; refreshUI(); return; }
+  // Drag référence si visible
+  if (showReference && Math.hypot(w.x - referencePos.x, w.y - referencePos.y) < 40) {
+    draggingReference = true;
+    moveState = { kind: 'ref', sx0: w.x, sy0: w.y, orig: { ...referencePos } };
+    return;
+  }
+
   if (currentTool === 'select') {
     // Glisser-déposer : drapeaux d'abord, puis éléments.
     if (levelFinish && Math.hypot(w.x - levelFinish.x, w.y - levelFinish.y) < 50) {
@@ -345,10 +386,16 @@ canvas.addEventListener('mousemove', e => {
   if (panState) { offsetX = panState.ox + (e.clientX - panState.startX); offsetY = panState.oy + (e.clientY - panState.startY); render(); return; }
   if (moveState) {
     const dx = snapV(w.x - moveState.sx0), dy = snapV(w.y - moveState.sy0);
-    if (moveState.kind === 'el') elements[selectedIdx] = applyDelta(structuredClone(moveState.orig), dx, dy);
-    else if (moveState.kind === 'start') levelStart = { x: moveState.orig.x + dx, y: moveState.orig.y + dy };
-    else if (moveState.kind === 'finish') levelFinish = { x: moveState.orig.x + dx, y: moveState.orig.y + dy };
-    render(); refreshJsonPreview(); return;
+    if (moveState.kind === 'ref') {
+      referencePos = { x: moveState.orig.x + dx, y: moveState.orig.y + dy };
+    } else if (moveState.kind === 'el') {
+      elements[selectedIdx] = applyDelta(structuredClone(moveState.orig), dx, dy);
+    } else if (moveState.kind === 'start') {
+      levelStart = { x: moveState.orig.x + dx, y: moveState.orig.y + dy };
+    } else if (moveState.kind === 'finish') {
+      levelFinish = { x: moveState.orig.x + dx, y: moveState.orig.y + dy };
+    }
+    render(); if (moveState.kind !== 'ref') refreshJsonPreview(); return;
   }
   if (dragState) { dragState.phase = 'drag'; dragState.x1 = snapV(w.x); dragState.y1 = snapV(w.y); render(); return; }
   if (curveDraft) render();
@@ -356,7 +403,12 @@ canvas.addEventListener('mousemove', e => {
 
 canvas.addEventListener('mouseup', e => {
   if (panState) { panState = null; return; }
-  if (moveState) { moveState = null; refreshUI(); return; }
+  if (moveState) {
+    draggingReference = false;
+    moveState = null;
+    if (!showReference) refreshUI(); else render();
+    return;
+  }
   if (!dragState) return;
   const { x0, y0, x1, y1 } = dragState;
   dragState = null;
@@ -619,6 +671,12 @@ document.getElementById('file-input').addEventListener('change', ev => {
   };
   reader.readAsText(file);
   ev.target.value = '';
+});
+
+document.getElementById('btn-reference').addEventListener('click', () => {
+  showReference = !showReference;
+  document.getElementById('btn-reference').textContent = showReference ? '📏 Masquer repères' : '📏 Afficher repères';
+  render();
 });
 
 // ── Outils & vue ───────────────────────────────────────────────────────────
