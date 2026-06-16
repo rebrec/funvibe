@@ -444,15 +444,18 @@ export default class LevelScene extends Phaser.Scene {
   goToHub() {
     this._resetUIFlags();
     this.scene.stop('UIScene');
-    if (this.scene.isPaused('HubScene')) {
-      // Venue normale depuis le hub (mis en pause) → on le réveille.
-      this.scene.stop();
-      this.scene.resume('HubScene');
-      this.scene.launch('UIScene');
-    } else {
-      // Venue d'un niveau custom (hub stoppé) → on le redémarre (relance l'UIScene).
-      this.scene.start('HubScene');
-    }
+    // Différer l'arrêt/reprise des scènes pour éviter un freeze (le stop() immédiat dans une méthode de scène est problématique).
+    this.time.delayedCall(0, () => {
+      if (this.scene.isPaused('HubScene')) {
+        // Venue normale depuis le hub (mis en pause) → on le réveille.
+        this.scene.stop();
+        this.scene.resume('HubScene');
+        this.scene.launch('UIScene');
+      } else {
+        // Venue d'un niveau custom (hub stoppé) → on le redémarre (relance l'UIScene).
+        this.scene.start('HubScene');
+      }
+    });
   }
 
   update(time, delta) {
