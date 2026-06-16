@@ -306,6 +306,10 @@ function drawDragPreview() {
 
 function drawReference() {
   // Affiche un repère de joueur + distances de saut, draggable.
+  // Distances calculées d'après la physique du jeu :
+  // - JUMP_VELOCITY = 13, GRAVITY = 1.3 → durée saut ≈ 20 frames
+  // - RUN_SPEED = 5.0, AIR_ACCEL = 0.10 → accélération lente en l'air
+  // - Chaque saut aérien prend moins de temps → distance décroît
   const c = toCanvas(referencePos.x, referencePos.y);
   const playerW = 22 * zoom, playerH = 36 * zoom; // taille du joueur
 
@@ -317,15 +321,16 @@ function drawReference() {
   ctx.fillStyle = '#ffcc66'; ctx.font = `bold ${Math.max(8, 9*zoom)}px monospace`;
   ctx.textAlign = 'center'; ctx.fillText('J', c.x, c.y + playerH/2 + 8);
 
-  // Arcs de saut : 1 saut ≈ 280px, 2 sauts ≈ 400px (approx from constants)
-  const jump1Dist = 280, jump2Dist = 420, jump3Dist = 540;
+  // Arcs de saut réalistes (en pixels du monde)
+  // 1 saut ≈ 400px, 2 sauts ≈ 700px, 3 sauts ≈ 950px
+  const jumpDists = [400, 700, 950];
   ctx.strokeStyle = '#ffff6666'; ctx.lineWidth = 1; ctx.setLineDash([3, 2]);
 
-  [jump1Dist, jump2Dist, jump3Dist].forEach((dist, i) => {
+  jumpDists.forEach((dist, i) => {
     const rad = dist * zoom;
     ctx.beginPath(); ctx.arc(c.x, c.y, rad, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = '#ffffff'; ctx.font = `${Math.max(8, 9*zoom)}px monospace`;
-    ctx.textAlign = 'left'; ctx.fillText(`${i+1}s`, c.x + rad + 4, c.y - 4);
+    ctx.textAlign = 'left'; ctx.fillText(`${i+1}S`, c.x + rad + 4, c.y - 4);
   });
   ctx.setLineDash([]);
 }
