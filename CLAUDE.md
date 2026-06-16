@@ -21,6 +21,10 @@ npm test         # Vitest (fonctions pures : WorldLoader, Skins, curve)
 npm run report   # tests + build + captures Playwright → tests-output/<horodatage>/ (gitignoré)
 ```
 
+**Fullscreen** : F11 natif (Phaser scale config `fullscreenTarget`, `expandParent`) ; bouton ⛶ en haut-droit sur mobile.
+**Mobile/Tactile** : contrôles tactiles (boutons virtuels) : gauche/droite/saut/attaque/shuriken, caché sur desktop, auto-détecté sur mobile via UA.
+**Déploiement** : GitHub Pages via workflow GitHub Actions (`.github/workflows/deploy.yml`) — déclenché à chaque push sur main/master. Build → déploie `dist/` vers `/funvibe/` (base URL paramétrable).
+
 Je ne peux pas juger le **ressenti** (saut, vitesse, combat, zoom) à la place de l'utilisateur :
 après chaque changement de feel, je construis (`npm run build`), je vérifie le rendu via
 `npm run report` (captures réelles), puis je demande un test navigateur.
@@ -30,12 +34,13 @@ Enfants 8 ans et +, doit aussi plaire aux ados/adultes. Univers façon *Ninja Le
 (personnages fins/agiles) — à concrétiser à la passe artistique.
 
 ## Architecture
-- `src/main.js` — config Phaser (Matter, scènes : Boot/Hub/Level/UI/Shop/SkinDebug/CustomLevels), `scale: FIT`.
+- `src/main.js` — config Phaser (Matter, scènes : Boot/Hub/Level/UI/Shop/SkinDebug/CustomLevels), `scale: FIT, fullscreenTarget, expandParent`.
 - `src/core/Constants.js` — **TOUS les réglages** (gravité, vitesses, saut, combat, ennemis, projectiles, boutique).
-- `src/core/InputManager.js` — abstraction clavier→**actions**. **Ne jamais lire le clavier dans le gameplay** (tactile mobile plus tard).
+- `src/core/InputManager.js` — abstraction clavier→**actions**. **Ne jamais lire le clavier dans le gameplay**. Supporte entrées virtuelles (`setVirtual`) pour les contrôles tactiles.
+- `src/core/TouchControls.js` — boutons tactiles sur mobile (détection UA) ; rendu Canvas, interaction pointerdown/up → `InputManager.setVirtual()`.
 - `src/core/SaveManager.js` — persistance `localStorage` (pièces, cristaux, upgrades).
 - `src/core/Skins.js` — **textures/anims procédurales** : `generatePlayerTexture` = spritesheet articulée 16 frames (idle/course/saut/chute/atterrissage/rotation-boule/touché), `generateEnemyTexture` 2 frames ; thèmes + décors. Clé de texture paramétrable → brancher des **PNG** plus tard.
-- `src/data/levels/*.json` — **niveaux en données** (`level1.json` démo, `hub.json`). Types : ground/platform/wall/slope/curve/landmark + enemies/coins/crystals/start/finish/hubPortal/horizon/camera/world.
+- `src/data/levels/*.json` — **niveaux en données** (`level1.json` démo, `hub.json`). Types : ground/platform/wall/slope/curve (pente douce)/island (île fermée)/landmark + enemies/coins/crystals/start/finish/hubPortal/horizon/camera/world.
 - `src/world/WorldLoader.js` — `build(scene, data, theme)` instancie le niveau. `src/world/curve.js` — `smoothCurve()` (Catmull-Rom, pentes douces Sonic).
 - `src/entities/` — `Player.js` (déplacement, multi-saut + anims + pirouette), `Enemy.js` (walker/charger + anim), `Projectile.js` (shuriken), `WeaponVisual.js` (poing/arme).
 - `src/scenes/` — Boot (textures+anims+save), Hub (bouton ÉDITEUR, portail CUSTOM), Level (WorldLoader, finish, **zoom adaptatif**), UI (HUD + aide **hors zoom**), Shop, SkinDebug (F2), CustomLevels.
