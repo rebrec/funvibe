@@ -75,6 +75,10 @@ export default class LevelScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(this.theme.background);
 
     this.input_ = new InputManager(this);
+    // Wire touch controls if available (mobile only)
+    const touchControls = this.registry.get('touchControls');
+    if (touchControls) touchControls.setInputManager(this.input_);
+
     this.collectibles = new Map(); // body Matter -> { vis, type }
     this.enemies = [];
     this.projectiles = new Map(); // body Matter -> Projectile

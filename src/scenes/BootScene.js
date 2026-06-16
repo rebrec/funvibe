@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { PLAYER } from '../core/Constants.js';
 import SaveManager from '../core/SaveManager.js';
+import TouchControls from '../core/TouchControls.js';
 import {
   generatePlayerTexture,
   generateEnemyTexture,
@@ -24,6 +25,10 @@ export default class BootScene extends Phaser.Scene {
     generateShurikenTexture(this);
 
     this._createAnimations();
+
+    // Contrôles tactiles (mobile uniquement, caché sur desktop)
+    const touchControls = new TouchControls(this);
+    this.registry.set('touchControls', touchControls);
 
     // Charge la sauvegarde et initialise le registre global.
     const save = SaveManager.load();

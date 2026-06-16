@@ -16,8 +16,10 @@ const config = {
   backgroundColor: GAME.BACKGROUND,
   pixelArt: false,
   scale: {
-    mode: Phaser.Scale.FIT, // s'adapte à la fenêtre (et au mobile plus tard)
+    mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
+    fullscreenTarget: 'parent',
+    expandParent: true,
   },
   physics: {
     default: 'matter',
