@@ -123,8 +123,11 @@ export default class LevelScene extends Phaser.Scene {
     this.matter.world.on('collisionstart', this.onCollect, this);
     this.matter.world.on('collisionstart', this.onProjectileHit, this);
     this.events.once('shutdown', () => {
-      this.matter.world.off('collisionstart', this.onCollect, this);
-      this.matter.world.off('collisionstart', this.onProjectileHit, this);
+      // matter.world peut déjà être détruit au shutdown → garde-fou contre le null.
+      if (this.matter && this.matter.world) {
+        this.matter.world.off('collisionstart', this.onCollect, this);
+        this.matter.world.off('collisionstart', this.onProjectileHit, this);
+      }
     });
   }
 

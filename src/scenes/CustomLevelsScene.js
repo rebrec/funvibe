@@ -55,9 +55,11 @@ export default class CustomLevelsScene extends Phaser.Scene {
 
   _play(idx) {
     this.scene.stop('UIScene');
-    this.scene.stop('HubScene');
+    // HubScene reste en PAUSE (déjà pausé par le hub avant d'ouvrir cet overlay) :
+    // au retour, goToHub() la reprend → le joueur conserve sa position devant la porte
+    // (au lieu de respawn au début si on stoppait/redémarrait la scène).
     this.scene.stop();
-    this.scene.start('LevelScene', { customLevelIdx: idx });
+    this.scene.launch('LevelScene', { customLevelIdx: idx });
   }
 
   update() {

@@ -31,5 +31,6 @@ const config = {
   scene: [BootScene, HubScene, LevelScene, UIScene, ShopScene, SkinDebugScene, CustomLevelsScene],
 };
 
-// eslint-disable-next-line no-new
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+// Exposé pour les tests automatisés (Playwright). Inoffensif en prod.
+if (typeof window !== 'undefined') window.__game = game;
