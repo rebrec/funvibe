@@ -442,13 +442,10 @@ export function generateShurikenTexture(scene) {
 // Dessine les décors de fond pour un niveau (monde large).
 // worldH est nécessaire pour le remplissage terreux global.
 export function buildLevelDecor(scene, theme, worldW, worldH, groundY) {
-  // ── Couche de fond (depth -5) : remplissage terreux global sous la ligne d'horizon
-  const gBase = scene.add.graphics().setDepth(-5);
-  gBase.fillStyle(theme.groundBody, 1);
-  gBase.fillRect(0, groundY, worldW, worldH - groundY);
-  // Bande de surface sur toute la largeur
-  gBase.fillStyle(theme.groundTop, 1);
-  gBase.fillRect(0, groundY, worldW, 12);
+  // NOTE : on ne dessine PAS de sol plein global ici. Chaque terrain réel
+  // (addGroundSection / addCurve / addIsland) peint son propre remplissage.
+  // Un faux sol décoratif sur toute la largeur donnerait l'illusion d'un sol
+  // praticable là où il n'y a que du vide → on préfère laisser voir le vide.
 
   // ── Couche décors (depth -10) : éléments thématiques
   const g = scene.add.graphics().setDepth(-10);
