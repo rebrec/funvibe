@@ -22,6 +22,9 @@ let levelStart  = { x: 120, y: 1900 };
 let levelFinish = null;
 let elements    = []; // { type, ... } pour terrain + entités
 let curveDraft  = null; // points de la courbe en cours de tracé
+let resumingIdx = -1;   // index de la curve existante qu'on prolonge (-1 = nouvelle)
+let curveMagnet = null; // {x,y} extrémité de curve survolée (aimant), pour l'aperçu
+const CURVE_MAGNET_R = 30; // rayon d'accroche (px monde) à l'extrémité d'une curve
 let showReference = false;
 let referencePos = { x: 500, y: 1500 }; // position du repère joueur
 let draggingReference = false;
@@ -133,6 +136,13 @@ function render() {
 
   if (dragState && dragState.phase === 'drag') drawDragPreview();
   if (curveDraft) drawCurveDraft();
+  if (curveMagnet) {
+    const c = toCanvas(curveMagnet.x, curveMagnet.y);
+    ctx.strokeStyle = '#66ffcc'; ctx.lineWidth = 2; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(c.x, c.y, 9, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#66ffcc'; ctx.font = '11px monospace'; ctx.textAlign = 'left';
+    ctx.fillText('prolonger', c.x + 12, c.y - 8);
+  }
   if (showReference) drawReference();
 }
 
@@ -268,6 +278,20 @@ function drawCheckered(pos) {
   ctx.fillText('ARRIVÉE', c.x, c.y + 14); ctx.textAlign = 'start';
 }
 
+// Cherche l'extrémité (1er ou dernier point) d'une pente douce existante proche de (wx,wy).
+// Renvoie { idx, end:'first'|'last', x, y } ou null. Sert à l'aimant de reprise.
+function findCurveEndpoint(wx, wy) {
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i];
+    if (el.type !== 'curve' || !el.points || el.points.length < 2) continue;
+    const first = el.points[0];
+    const last = el.points[el.points.length - 1];
+    if (Math.hypot(wx - last.x, wy - last.y) < CURVE_MAGNET_R) return { idx: i, end: 'last', x: last.x, y: last.y };
+    if (Math.hypot(wx - first.x, wy - first.y) < CURVE_MAGNET_R) return { idx: i, end: 'first', x: first.x, y: first.y };
+  }
+  return null;
+}
+
 function drawCurveDraft() {
   const pts = curveDraft;
   if (!pts.length) return;
@@ -345,7 +369,7 @@ function drawReference() {
 // ── Souris ───────────────────────────────────────────────────────────────
 canvas.addEventListener('contextmenu', e => {
   e.preventDefault();
-  if (curveDraft) { curveDraft = null; render(); return; }
+  if (curveDraft) { curveDraft = null; resumingIdx = -1; render(); return; }
   const w = toWorld(e.offsetX, e.offsetY);
   const hit = hitTest(w.x, w.y);
   if (hit >= 0) { elements.splice(hit, 1); selectedIdx = -1; refreshUI(); }
@@ -363,7 +387,27 @@ canvas.addEventListener('mousedown', e => {
   if (currentTool === 'curve' || currentTool === 'island') {
     // e.detail === 2 = deuxième clic du double-clic (finalization, ne pas ajouter de point)
     if (e.detail < 2) {
-      curveKind = currentTool; (curveDraft ??= []).push({ x: sx, y: sy }); render();
+      // Aimant : pas de tracé en cours + clic près de l'extrémité d'une pente existante
+      // → on la REPREND pour la prolonger (un seul objet curve, pas de point en double).
+      if (!curveDraft && currentTool === 'curve') {
+        const grab = findCurveEndpoint(w.x, w.y);
+        if (grab) {
+          const el = elements[grab.idx];
+          curveKind = 'curve';
+          curveDraft = el.points.map(p => ({ x: p.x, y: p.y }));
+          if (grab.end === 'first') curveDraft.reverse(); // l'extrémité agrippée devient la fin
+          resumingIdx = grab.idx;
+          curveMagnet = null;
+          render();
+          return; // on a juste agrippé : aucun nouveau point ajouté ici
+        }
+      }
+      curveKind = currentTool;
+      curveDraft ??= [];
+      // Garde anti-doublon : ne pas empiler deux points au même endroit.
+      const lastP = curveDraft[curveDraft.length - 1];
+      if (!lastP || lastP.x !== sx || lastP.y !== sy) curveDraft.push({ x: sx, y: sy });
+      render();
     }
     return;
   }
@@ -410,7 +454,14 @@ canvas.addEventListener('mousemove', e => {
     render(); if (moveState.kind !== 'ref') refreshJsonPreview(); return;
   }
   if (dragState) { dragState.phase = 'drag'; dragState.x1 = snapV(w.x); dragState.y1 = snapV(w.y); render(); return; }
-  if (curveDraft) render();
+  if (curveDraft) { render(); return; }
+  // Aperçu de l'aimant : surligne l'extrémité de curve sous le curseur (outil curve, hors tracé).
+  if (currentTool === 'curve') {
+    const grab = findCurveEndpoint(w.x, w.y);
+    const next = grab ? { x: grab.x, y: grab.y } : null;
+    const changed = (!!next !== !!curveMagnet) || (next && curveMagnet && (next.x !== curveMagnet.x || next.y !== curveMagnet.y));
+    if (changed) { curveMagnet = next; render(); }
+  } else if (curveMagnet) { curveMagnet = null; render(); }
 });
 
 canvas.addEventListener('mouseup', e => {
@@ -449,16 +500,23 @@ canvas.addEventListener('dblclick', () => { finalizeCurve(); });
 
 window.addEventListener('keydown', e => {
   if (e.key === 'Enter') finalizeCurve();
-  else if (e.key === 'Escape') { if (curveDraft) { curveDraft = null; render(); } else { selectedIdx = -1; refreshUI(); } }
+  else if (e.key === 'Escape') { if (curveDraft) { curveDraft = null; resumingIdx = -1; render(); } else { selectedIdx = -1; refreshUI(); } }
 });
 
 function finalizeCurve() {
   const min = curveKind === 'island' ? 3 : 2;
   if (curveDraft && curveDraft.length >= min) {
-    elements.push({ type: curveKind, points: curveDraft });
-    selectedIdx = elements.length - 1;
+    if (resumingIdx >= 0 && curveKind === 'curve' && elements[resumingIdx]) {
+      // Reprise : on remplace la curve existante par sa version prolongée.
+      elements[resumingIdx] = { type: 'curve', points: curveDraft };
+      selectedIdx = resumingIdx;
+    } else {
+      elements.push({ type: curveKind, points: curveDraft });
+      selectedIdx = elements.length - 1;
+    }
   }
   curveDraft = null;
+  resumingIdx = -1;
   refreshUI();
 }
 
@@ -715,3 +773,6 @@ document.getElementById('zoom').addEventListener('input', e => {
 // ── Démarrage ──────────────────────────────────────────────────────────────
 resizeCanvas();
 refreshUI();
+
+// Hook de test (Playwright) : inspection de l'état. Inoffensif en usage normal.
+if (typeof window !== 'undefined') window.__editorElements = () => elements;
