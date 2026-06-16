@@ -321,11 +321,12 @@ function drawReference() {
   ctx.textAlign = 'center'; ctx.fillText('J', c.x, c.y + playerH/2 + 8);
 
   // Ellipses de saut : rayon horizontal (distance) et vertical (hauteur atteinte)
-  // 1S: 400px horiz, 65px vert | 2S: 700px horiz, 112px vert | 3S: 950px horiz, 159px vert
+  // Mesurés sur un niveau de test avec plateformes en quinconce
+  // 1S: 400px horiz, 220px vert | 2S: 700px horiz, 380px vert | 3S: 950px horiz, 520px vert
   const jumpData = [
-    { horiz: 400, vert: 65 },
-    { horiz: 700, vert: 112 },
-    { horiz: 950, vert: 159 }
+    { horiz: 400, vert: 220 },
+    { horiz: 700, vert: 380 },
+    { horiz: 950, vert: 520 }
   ];
   ctx.strokeStyle = '#ffff6666'; ctx.lineWidth = 1; ctx.setLineDash([3, 2]);
 
