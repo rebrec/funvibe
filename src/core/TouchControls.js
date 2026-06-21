@@ -5,18 +5,21 @@ import { GAME } from './Constants.js';
 
 const MOBILE_RE = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
 
-// Détection : on affiche les boutons tactiles si l'appareil est mobile OU
-// possède un écran tactile. Surcharge possible via l'URL pour pouvoir tester
-// depuis un desktop : ?touch=1 (force l'affichage) · ?touch=0 (force le masquage).
+// Détection mobile. Surcharge URL possible pour tester sur desktop :
+//   ?touch=1  → force l'affichage des boutons
+//   ?touch=0  → force le masquage
+// On couvre aussi l'iPad (iPadOS 13+ se déclare comme macOS mais a ontouchstart).
+// On N'utilise PAS maxTouchPoints : Chrome sur Windows le rapporte à 10
+// même sans écran tactile, ce qui activait les boutons sur tous les desktops.
 function detectTouch() {
   try {
     const q = new URLSearchParams(window.location.search).get('touch');
     if (q === '1' || q === 'true')  return true;
     if (q === '0' || q === 'false') return false;
   } catch { /* ignore */ }
-  const uaMobile  = MOBILE_RE.test(navigator.userAgent);
-  const hasTouch  = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-  return uaMobile || hasTouch;
+  const uaMobile = MOBILE_RE.test(navigator.userAgent);
+  const isIpad   = /macintosh/i.test(navigator.userAgent) && ('ontouchstart' in window);
+  return uaMobile || isIpad;
 }
 
 export default class TouchControls {
