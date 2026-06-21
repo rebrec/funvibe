@@ -28,10 +28,10 @@ export default class HubScene extends Phaser.Scene {
     this.input_ = new InputManager(this);
 
     // Contrôles tactiles : monter dans cette scène et connecter l'InputManager.
-    const touchControls = this.registry.get('touchControls');
-    if (touchControls) {
-      touchControls.mount(this);
-      touchControls.setInputManager(this.input_);
+    this._touch = this.registry.get('touchControls');
+    if (this._touch) {
+      this._touch.mount(this);
+      this._touch.setInputManager(this.input_);
     }
 
     this.doors = [];
@@ -220,6 +220,7 @@ export default class HubScene extends Phaser.Scene {
     } else {
       this.hintText.setVisible(false);
     }
+    this._touch?.setInteractVisible(!!nearDoor);
 
     if (this.player.y > HUB_H) {
       this.player.setVelocity(0, 0);

@@ -28,6 +28,7 @@ export default class TouchControls {
     this._buttons     = [];
     this._scene       = null;
     this._pointerMap  = new Map(); // pointerId → button
+    this._interactBtn = null;      // bouton « ENTRER » contextuel (masqué par défaut)
   }
 
   // Appeler au create() de chaque scène jouable (HubScene, LevelScene, …).
@@ -46,6 +47,25 @@ export default class TouchControls {
 
   setInputManager(im) {
     this.inputManager = im;
+  }
+
+  // Affiche/masque le bouton « ENTRER » (porte de hub, portail de retour…).
+  // Appelé depuis les boucles update des scènes selon la proximité.
+  setInteractVisible(v) {
+    const b = this._interactBtn;
+    if (!b || b.hidden === !v) return; // pas de changement
+    b.hidden = !v;
+    if (!v) {
+      // En masquant, on relâche l'action si elle était maintenue.
+      if (b.pressed) {
+        b.pressed = false;
+        this.inputManager?.setVirtual('interact', false);
+        for (const [id, btn] of this._pointerMap) {
+          if (btn === b) this._pointerMap.delete(id);
+        }
+      }
+    }
+    this._draw();
   }
 
   // ── Privé ────────────────────────────────────────────────────────────────
@@ -80,8 +100,12 @@ export default class TouchControls {
       { x: W - M - S,          y: y - S - G, w: S, h: S, label: 'SHU', action: 'ranged' },
       // Fullscreen (coin haut-droit)
       { x: W - M - 52, y: M, w: 52, h: 46, label: '⛶', action: 'fullscreen' },
+      // Interaction « ENTRER » : centré en haut, masqué tant qu'on n'est pas
+      // près d'une porte / d'un portail (piloté par setInteractVisible).
+      { x: W / 2 - 70, y: M, w: 140, h: 48, label: 'ENTRER', action: 'interact', hidden: true },
     ];
     for (const b of this._buttons) b.pressed = false;
+    this._interactBtn = this._buttons.find(b => b.action === 'interact');
 
     this._graphics = scene.add.graphics().setDepth(1000).setScrollFactor(0);
 
@@ -92,7 +116,8 @@ export default class TouchControls {
         fontSize: isLong ? '13px' : '24px',
         color: '#ffffff',
         fontStyle: 'bold',
-      }).setOrigin(0.5).setDepth(1001).setScrollFactor(0);
+      }).setOrigin(0.5).setDepth(1001).setScrollFactor(0).setVisible(!b.hidden);
+      b._label = t;
       this._labels.push(t);
     }
 
@@ -108,18 +133,24 @@ export default class TouchControls {
     g.clear();
     for (let i = 0; i < this._buttons.length; i++) {
       const b = this._buttons[i];
-      const alpha = b.pressed ? 0.88 : 0.52;
-      const fill  = b.pressed ? 0x55bbff : 0x1a2d55;
+      if (b._label) b._label.setVisible(!b.hidden);
+      if (b.hidden) continue;
+      // Le bouton « ENTRER » se distingue (vert) pour attirer l'œil.
+      const accent = b.action === 'interact';
+      const alpha = b.pressed ? 0.92 : 0.6;
+      const fill  = b.pressed ? (accent ? 0x66dd88 : 0x55bbff)
+                              : (accent ? 0x2a8a4a : 0x1a2d55);
       g.fillStyle(fill, alpha);
       g.fillRoundedRect(b.x, b.y, b.w, b.h, 12);
-      g.lineStyle(2, b.pressed ? 0xffffff : 0x4477aa, b.pressed ? 1 : 0.7);
+      g.lineStyle(2, b.pressed ? 0xffffff : (accent ? 0x88ffaa : 0x4477aa), b.pressed ? 1 : 0.8);
       g.strokeRoundedRect(b.x, b.y, b.w, b.h, 12);
-      if (this._labels[i]) this._labels[i].setAlpha(b.pressed ? 1 : 0.85);
+      if (b._label) b._label.setAlpha(b.pressed ? 1 : 0.9);
     }
   }
 
   _onDown(pointer) {
     for (const b of this._buttons) {
+      if (b.hidden) continue;
       if (!b.pressed && this._hit(pointer, b)) {
         b.pressed = true;
         this._pointerMap.set(pointer.id, b);

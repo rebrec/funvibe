@@ -77,10 +77,10 @@ export default class LevelScene extends Phaser.Scene {
     this.input_ = new InputManager(this);
 
     // Contrôles tactiles : monter dans cette scène et connecter l'InputManager.
-    const touchControls = this.registry.get('touchControls');
-    if (touchControls) {
-      touchControls.mount(this);
-      touchControls.setInputManager(this.input_);
+    this._touch = this.registry.get('touchControls');
+    if (this._touch) {
+      this._touch.mount(this);
+      this._touch.setInputManager(this.input_);
     }
 
     this.collectibles = new Map(); // body Matter -> { vis, type }
@@ -557,6 +557,7 @@ export default class LevelScene extends Phaser.Scene {
       this.player.x, this.player.y, this.hubPortal.x, this.hubPortal.y
     ) < this.hubPortal.radius;
     this.registry.set('nearHub', nearHub);
+    this._touch?.setInteractVisible(nearHub);
     if (nearHub && this.input_.isInteractJustPressed()) this.goToHub();
 
     // Arrivée : franchir la zone termine le niveau.
