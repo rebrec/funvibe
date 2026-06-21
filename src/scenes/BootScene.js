@@ -26,8 +26,8 @@ export default class BootScene extends Phaser.Scene {
 
     this._createAnimations();
 
-    // Contrôles tactiles (mobile uniquement, caché sur desktop)
-    const touchControls = new TouchControls(this);
+    // Contrôles tactiles (mobile uniquement). Montés dans chaque scène via mount().
+    const touchControls = new TouchControls();
     this.registry.set('touchControls', touchControls);
 
     // Charge la sauvegarde et initialise le registre global.

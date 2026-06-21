@@ -26,6 +26,14 @@ export default class HubScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor(this.theme.background);
 
     this.input_ = new InputManager(this);
+
+    // Contrôles tactiles : monter dans cette scène et connecter l'InputManager.
+    const touchControls = this.registry.get('touchControls');
+    if (touchControls) {
+      touchControls.mount(this);
+      touchControls.setInputManager(this.input_);
+    }
+
     this.doors = [];
 
     buildHubDecor(this, this.theme, HUB_W, GROUND_Y);

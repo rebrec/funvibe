@@ -22,7 +22,9 @@ export default class InputManager {
 
     // État "virtuel" pour le tactile (rempli plus tard par des boutons à l'écran).
     this.virtual = { left: false, right: false, jump: false, attack: false, ranged: false, interact: false };
-    this._virtualJumpJustPressed = false;
+    this._virtualJumpJustPressed   = false;
+    this._virtualAttackJustPressed = false;
+    this._virtualRangedJustPressed = false;
   }
 
   _anyDown(list) {
@@ -57,23 +59,29 @@ export default class InputManager {
   }
 
   isAttackJustPressed() {
-    return this._anyJustDown(this.keys.attack) || false;
+    const kbJust   = this._anyJustDown(this.keys.attack);
+    const virtJust = this._virtualAttackJustPressed;
+    this._virtualAttackJustPressed = false;
+    return kbJust || virtJust;
   }
 
   isRangedJustPressed() {
-    return this._anyJustDown(this.keys.ranged) || false;
+    const kbJust   = this._anyJustDown(this.keys.ranged);
+    const virtJust = this._virtualRangedJustPressed;
+    this._virtualRangedJustPressed = false;
+    return kbJust || virtJust;
   }
 
   isInteractJustPressed() {
     return this._anyJustDown(this.keys.interact) || false;
   }
 
-  // --- API destinée aux futurs boutons tactiles ---
+  // --- API destinée aux boutons tactiles ---
   setVirtual(action, value) {
     if (!(action in this.virtual)) return;
-    if (action === 'jump' && value && !this.virtual.jump) {
-      this._virtualJumpJustPressed = true;
-    }
+    if (action === 'jump'   && value && !this.virtual.jump)   this._virtualJumpJustPressed   = true;
+    if (action === 'attack' && value && !this.virtual.attack) this._virtualAttackJustPressed = true;
+    if (action === 'ranged' && value && !this.virtual.ranged) this._virtualRangedJustPressed = true;
     this.virtual[action] = value;
   }
 }

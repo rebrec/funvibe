@@ -57,10 +57,13 @@ export default class UIScene extends Phaser.Scene {
   // Éléments d'interface propres au niveau (aide, retour hub, bannière de fin,
   // badge custom). Rendus ici → non affectés par le zoom de la caméra de jeu.
   _buildLevelUI() {
-    this.levelHelp = this.add.text(16, GAME.HEIGHT - 52, [
+    const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(navigator.userAgent);
+    const helpLines = isMobile ? [] : [
       'Flèches / A-D : se déplacer   ·   Espace / ↑ / W : sauter (double-saut)',
       'J / X : frapper   ·   K / L : shuriken   ·   molette : zoom   ·   ramasse pièces & cristaux',
-    ], { fontFamily: 'monospace', fontSize: '15px', color: '#0a2233', lineSpacing: 4 }).setDepth(50);
+    ];
+    this.levelHelp = this.add.text(16, GAME.HEIGHT - 52, helpLines,
+      { fontFamily: 'monospace', fontSize: '15px', color: '#0a2233', lineSpacing: 4 }).setDepth(50);
     this.levelHelp.setShadow(0, 1, '#ffffff', 0);
 
     this.hubReturnHint = this.add.text(GAME.WIDTH / 2, GAME.HEIGHT - 100, 'E : retourner au village', {
