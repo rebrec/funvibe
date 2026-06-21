@@ -5,9 +5,23 @@ import { GAME } from './Constants.js';
 
 const MOBILE_RE = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i;
 
+// Détection : on affiche les boutons tactiles si l'appareil est mobile OU
+// possède un écran tactile. Surcharge possible via l'URL pour pouvoir tester
+// depuis un desktop : ?touch=1 (force l'affichage) · ?touch=0 (force le masquage).
+function detectTouch() {
+  try {
+    const q = new URLSearchParams(window.location.search).get('touch');
+    if (q === '1' || q === 'true')  return true;
+    if (q === '0' || q === 'false') return false;
+  } catch { /* ignore */ }
+  const uaMobile  = MOBILE_RE.test(navigator.userAgent);
+  const hasTouch  = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+  return uaMobile || hasTouch;
+}
+
 export default class TouchControls {
   constructor() {
-    this.isMobile     = MOBILE_RE.test(navigator.userAgent);
+    this.isMobile     = detectTouch();
     this.inputManager = null;
     this._graphics    = null;
     this._labels      = [];
@@ -22,8 +36,12 @@ export default class TouchControls {
     this._scene = scene;
     if (!this.isMobile) return;
     this._build(scene);
-    // Auto-nettoyage à l'arrêt de la scène.
-    scene.events.once('shutdown', () => this._cleanup());
+    // Auto-nettoyage à l'arrêt de la scène. La garde évite qu'un shutdown
+    // tardif de l'ancienne scène ne détruise les boutons d'une nouvelle scène
+    // déjà montée (ordre Phaser non garanti).
+    scene.events.once('shutdown', () => {
+      if (this._scene === scene) this._cleanup();
+    });
   }
 
   setInputManager(im) {
