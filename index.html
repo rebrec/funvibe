@@ -9,14 +9,12 @@
     <title>jeuleo — maquette M0</title>
     <style>
       html, body {
-        margin: 0;
-        padding: 0;
-        height: 100%;
-        background: #1d2b3a;
+        margin: 0; padding: 0; height: 100%;
+        /* Couleur du ciel (= GAME.BACKGROUND) : les barres en paysage se fondent. */
+        background: #5fb6e6;
         overflow: hidden;
       }
-      /* position:fixed garantit width/height = taille viewport sur Android Chrome,
-         peu importe la hauteur calculée des ancêtres (évite le canvas à hauteur 0). */
+      /* position:fixed garantit la taille viewport exacte sur Android (évite canvas 0-height). */
       #game {
         position: fixed;
         top: 0; left: 0;
@@ -24,8 +22,27 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        background: #5fb6e6;
       }
-      /* Empêche sélection / zoom tactile / highlight pendant le jeu. */
+      /* Overlay portrait : masque le jeu et demande de tourner l'appareil. */
+      #rotate-overlay {
+        display: none;
+        position: fixed;
+        inset: 0; z-index: 9999;
+        background: #1d2b3a;
+        color: #fff;
+        font-family: monospace;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        gap: 16px;
+      }
+      #rotate-overlay .icon { font-size: 56px; }
+      #rotate-overlay p    { font-size: 22px; margin: 0; line-height: 1.4; }
+      @media (orientation: portrait) {
+        #rotate-overlay { display: flex; }
+      }
       * {
         -webkit-tap-highlight-color: transparent;
         -webkit-user-select: none;
@@ -36,6 +53,20 @@
   </head>
   <body>
     <div id="game"></div>
+
+    <!-- Overlay portrait (caché en paysage via media query) -->
+    <div id="rotate-overlay" aria-hidden="true">
+      <div class="icon">📱</div>
+      <p>Tourne ton appareil<br>en <strong>mode paysage</strong> 🎮</p>
+    </div>
+
+    <script>
+      // Demander le verrouillage paysage (Android Chrome, PWA).
+      // L'API n'est pas disponible partout → échec silencieux.
+      if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape').catch(() => {});
+      }
+    </script>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

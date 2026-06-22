@@ -159,6 +159,10 @@ export default class TouchControls {
         this._pointerMap.set(pointer.id, b);
         if (b.action === 'fullscreen') {
           this._scene?.scale.toggleFullscreen();
+          // Verrouiller le paysage après le passage en plein écran.
+          if (screen.orientation?.lock) {
+            screen.orientation.lock('landscape').catch(() => {});
+          }
         } else {
           this.inputManager?.setVirtual(b.action, true);
           if (navigator.vibrate) navigator.vibrate(8);
