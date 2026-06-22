@@ -6,64 +6,125 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>jeuleo — maquette M0</title>
+    <title>jeuleo</title>
     <style>
       html, body {
-        margin: 0; padding: 0; height: 100%;
-        /* Couleur du ciel (= GAME.BACKGROUND) : les barres en paysage se fondent. */
+        margin: 0; padding: 0;
+        width: 100%; height: 100%;
         background: #5fb6e6;
         overflow: hidden;
       }
-      /* position:fixed garantit la taille viewport exacte sur Android (évite canvas 0-height). */
       #game {
         position: fixed;
         top: 0; left: 0;
         width: 100%; height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         background: #5fb6e6;
       }
-      /* Overlay portrait : masque le jeu et demande de tourner l'appareil. */
-      #rotate-overlay {
-        display: none;
+
+      /* ── Écran de démarrage mobile ─────────────────────────────────────── */
+      #play-overlay {
         position: fixed;
         inset: 0; z-index: 9999;
-        background: #1d2b3a;
-        color: #fff;
-        font-family: monospace;
+        background: linear-gradient(160deg, #1a2e4a 0%, #0d1b2a 100%);
+        display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
+        gap: 20px;
+        color: #fff;
+        font-family: monospace;
         text-align: center;
-        gap: 16px;
+        padding: 24px;
+        box-sizing: border-box;
+        /* Masqué sur desktop (pas de touch), visible sur mobile via JS */
+        display: none;
       }
-      #rotate-overlay .icon { font-size: 56px; }
-      #rotate-overlay p    { font-size: 22px; margin: 0; line-height: 1.4; }
-      @media (orientation: portrait) {
-        #rotate-overlay { display: flex; }
+      #play-overlay .title {
+        font-size: 36px;
+        font-weight: bold;
+        letter-spacing: 3px;
+        color: #ffe066;
+        text-shadow: 0 2px 8px #0005;
       }
+      #play-overlay .subtitle {
+        font-size: 14px;
+        color: #aaccee;
+        margin-top: -12px;
+      }
+      #play-btn {
+        margin-top: 12px;
+        padding: 18px 48px;
+        font-size: 22px;
+        font-family: monospace;
+        font-weight: bold;
+        background: #ffe066;
+        color: #1a2e4a;
+        border: none;
+        border-radius: 14px;
+        cursor: pointer;
+        box-shadow: 0 4px 20px #0006;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+      }
+      #play-btn:active { transform: scale(0.96); }
+      #play-overlay .hint {
+        font-size: 13px;
+        color: #6688aa;
+        line-height: 1.6;
+      }
+      #play-overlay .icons { font-size: 48px; }
+
       * {
         -webkit-tap-highlight-color: transparent;
         -webkit-user-select: none;
         user-select: none;
         touch-action: none;
       }
+      /* Rétablir touch-action sur le bouton pour qu'il soit cliquable */
+      #play-btn { touch-action: manipulation; }
     </style>
   </head>
   <body>
     <div id="game"></div>
 
-    <!-- Overlay portrait (caché en paysage via media query) -->
-    <div id="rotate-overlay" aria-hidden="true">
-      <div class="icon">📱</div>
-      <p>Tourne ton appareil<br>en <strong>mode paysage</strong> 🎮</p>
+    <div id="play-overlay">
+      <div class="icons">🥷⚔️</div>
+      <div class="title">JEULEO</div>
+      <div class="subtitle">aventure &amp; plateforme</div>
+      <button id="play-btn" onclick="startGame()">▶ JOUER</button>
+      <p class="hint">
+        Pour la meilleure expérience :<br>
+        tourne ton téléphone en paysage 🔄
+      </p>
     </div>
 
     <script>
-      // Demander le verrouillage paysage (Android Chrome, PWA).
-      // L'API n'est pas disponible partout → échec silencieux.
-      if (screen.orientation && screen.orientation.lock) {
+      // N'affiche l'overlay que sur mobile (évite une popup inutile sur desktop).
+      const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(navigator.userAgent)
+                    || (/macintosh/i.test(navigator.userAgent) && 'ontouchstart' in window);
+      if (isMobile) {
+        document.getElementById('play-overlay').style.display = 'flex';
+      }
+
+      function startGame() {
+        // 1. Cacher l'overlay
+        document.getElementById('play-overlay').style.display = 'none';
+
+        // 2. Plein écran (nécessite un geste utilisateur — c'est ce tap qui le déclenche)
+        const el = document.documentElement;
+        const fsReq = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
+        if (fsReq) {
+          fsReq.call(el).catch(() => {});
+        }
+
+        // 3. Verrouiller en paysage (fonctionne sur Android Chrome, échec silencieux ailleurs)
+        if (screen.orientation?.lock) {
+          screen.orientation.lock('landscape').catch(() => {});
+        }
+      }
+
+      // Sur desktop : tentative de verrou au chargement (sans tap requis)
+      if (!isMobile && screen.orientation?.lock) {
         screen.orientation.lock('landscape').catch(() => {});
       }
     </script>
