@@ -15,9 +15,12 @@
         background: #1d2b3a;
         overflow: hidden;
       }
+      /* position:fixed garantit width/height = taille viewport sur Android Chrome,
+         peu importe la hauteur calculée des ancêtres (évite le canvas à hauteur 0). */
       #game {
-        width: 100%;
-        height: 100%;
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
         display: flex;
         align-items: center;
         justify-content: center;

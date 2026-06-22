@@ -19,7 +19,7 @@ const config = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     fullscreenTarget: 'parent',
-    expandParent: true,
+    expandParent: false, // on gère la taille du parent via CSS position:fixed
   },
   physics: {
     default: 'matter',
