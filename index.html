@@ -74,6 +74,25 @@
       }
       #play-overlay .icons { font-size: 48px; }
 
+      /* ── Hint « tourne l'écran » ───────────────────────────────────────────
+         N'apparaît qu'APRÈS avoir tapé JOUER (body.started) ET seulement si le
+         téléphone est encore en portrait (verrou paysage non appliqué). Dès que
+         l'appareil passe en paysage, la media query le masque automatiquement. */
+      #rotate-hint {
+        display: none;
+        position: fixed; inset: 0; z-index: 9000;
+        background: #0d1b2a;
+        color: #fff; font-family: monospace; text-align: center;
+        flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+        padding: 24px; box-sizing: border-box;
+      }
+      #rotate-hint .icon { font-size: 64px; animation: rot 1.6s ease-in-out infinite; }
+      #rotate-hint p { font-size: 20px; line-height: 1.5; margin: 0; }
+      @keyframes rot { 0%,100% { transform: rotate(0); } 50% { transform: rotate(90deg); } }
+      @media (orientation: portrait) {
+        body.started #rotate-hint { display: flex; }
+      }
+
       * {
         -webkit-tap-highlight-color: transparent;
         -webkit-user-select: none;
@@ -86,6 +105,12 @@
   </head>
   <body>
     <div id="game"></div>
+
+    <!-- Hint de secours si le verrou paysage n'a pas pu s'appliquer. -->
+    <div id="rotate-hint" aria-hidden="true">
+      <div class="icon">📱</div>
+      <p>Tourne ton téléphone<br>en <strong>mode paysage</strong> 🎮</p>
+    </div>
 
     <div id="play-overlay">
       <div class="icons">🥷⚔️</div>
@@ -106,21 +131,30 @@
         document.getElementById('play-overlay').style.display = 'flex';
       }
 
-      function startGame() {
-        // 1. Cacher l'overlay
-        document.getElementById('play-overlay').style.display = 'none';
-
-        // 2. Plein écran (nécessite un geste utilisateur — c'est ce tap qui le déclenche)
+      async function startGame() {
         const el = document.documentElement;
-        const fsReq = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
-        if (fsReq) {
-          fsReq.call(el).catch(() => {});
-        }
 
-        // 3. Verrouiller en paysage (fonctionne sur Android Chrome, échec silencieux ailleurs)
-        if (screen.orientation?.lock) {
-          screen.orientation.lock('landscape').catch(() => {});
-        }
+        // 1. PLEIN ÉCRAN d'abord, et on ATTEND qu'il soit effectif.
+        //    Crucial : sur Android Chrome, screen.orientation.lock() n'est
+        //    autorisé QUE si le document est déjà en plein écran. Sans ce await,
+        //    le lock échouait silencieusement → le tél restait en portrait →
+        //    le jeu 16:9 se réduisait à une bande (énormes bandes bleues).
+        try {
+          const fsReq = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen;
+          if (fsReq) await fsReq.call(el);
+        } catch { /* refusé : on continue, le hint portrait prendra le relais */ }
+
+        // 2. Verrouiller en PAYSAGE (maintenant qu'on est en plein écran).
+        try {
+          if (screen.orientation?.lock) await screen.orientation.lock('landscape');
+        } catch { /* non supporté : le hint « tourne l'écran » s'affichera */ }
+
+        // 3. Masquer l'overlay une fois les tentatives faites.
+        document.getElementById('play-overlay').style.display = 'none';
+        document.body.classList.add('started'); // active le hint portrait si besoin
+
+        // 4. Forcer Phaser à recalculer la taille après le changement de viewport.
+        setTimeout(() => window.__game?.scale?.refresh(), 150);
       }
 
       // Sur desktop : tentative de verrou au chargement (sans tap requis)
