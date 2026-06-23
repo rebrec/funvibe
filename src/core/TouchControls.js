@@ -80,6 +80,7 @@ export default class TouchControls {
     if (this._scene) {
       this._scene.input.off('pointerdown', this._onDown, this);
       this._scene.input.off('pointerup',   this._onUp,   this);
+      this._scene.input.off('pointerupoutside', this._onUp, this);
       this._scene = null;
     }
     this._pointerMap.clear();
@@ -126,8 +127,20 @@ export default class TouchControls {
 
     this._draw();
 
+    // CRUCIAL multi-touch : par défaut Phaser ne suit qu'UN pointeur tactile
+    // (pointer1). Sans ceci, appuyer sur gauche/droite ET saut en même temps
+    // ne déclenche qu'un seul bouton. On en active assez pour D-pad + 2 actions.
+    // mount() est rappelé à chaque scène : on n'ajoute que ce qui manque
+    // (addPointer s'accumulerait sinon, plafonné à 10 par Phaser).
+    const needed = 4; // total de pointeurs simultanés souhaités
+    const current = scene.input.manager.pointersTotal;
+    if (current < needed) scene.input.addPointer(needed - current);
+
     scene.input.on('pointerdown', this._onDown, this);
     scene.input.on('pointerup',   this._onUp,   this);
+    // pointerupoutside : un doigt relâché hors de l'écran/zone ne laisse pas
+    // un bouton "collé" en position pressée.
+    scene.input.on('pointerupoutside', this._onUp, this);
   }
 
   _draw() {

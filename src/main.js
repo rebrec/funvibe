@@ -34,3 +34,18 @@ const config = {
 const game = new Phaser.Game(config);
 // Exposé pour les tests automatisés (Playwright). Inoffensif en prod.
 if (typeof window !== 'undefined') window.__game = game;
+
+// En FIT, Phaser écoute le resize fenêtre, mais le passage plein écran
+// (déclenché sur documentElement depuis index.html) et la rotation mobile
+// ne provoquent pas toujours un recalcul → canvas resté petit, bandes énormes.
+// On force un refresh après ces transitions (léger délai = viewport stabilisé).
+if (typeof window !== 'undefined') {
+  const refresh = () => game.scale.refresh();
+  window.addEventListener('resize', refresh);
+  window.addEventListener('orientationchange', () => setTimeout(refresh, 120));
+  document.addEventListener('fullscreenchange',       () => setTimeout(refresh, 120));
+  document.addEventListener('webkitfullscreenchange', () => setTimeout(refresh, 120));
+  if (screen.orientation?.addEventListener) {
+    screen.orientation.addEventListener('change', () => setTimeout(refresh, 120));
+  }
+}
